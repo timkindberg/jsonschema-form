@@ -384,6 +384,51 @@ describe('parseSchema', () => {
 
       expect(allFields.every(f => f.nodeType === 'field')).toBe(true)
     })
+
+    it('getAllFields from nested group only returns descendants, not siblings or parents', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          email: { type: 'string' },
+          address: {
+            type: 'object',
+            properties: {
+              street: { type: 'string' },
+              city: { type: 'string' },
+              country: {
+                type: 'object',
+                properties: {
+                  code: { type: 'string' },
+                  name: { type: 'string' }
+                }
+              }
+            }
+          },
+          phone: { type: 'string' }
+        }
+      }
+
+      const form = parseSchema(schema)
+      const addressGroup = form.children.find(c => c.path === 'address') as GroupNode
+
+      // Get all fields from the address group
+      const addressFields = addressGroup.getAllFields()
+
+      // Should only include descendants of address (street, city, country.code, country.name)
+      expect(addressFields).toHaveLength(4)
+      expect(addressFields.map(f => f.path).sort()).toEqual([
+        'address.city',
+        'address.country.code',
+        'address.country.name',
+        'address.street'
+      ].sort())
+
+      // Should NOT include siblings (name, email, phone)
+      expect(addressFields.find(f => f.path === 'name')).toBeUndefined()
+      expect(addressFields.find(f => f.path === 'email')).toBeUndefined()
+      expect(addressFields.find(f => f.path === 'phone')).toBeUndefined()
+    })
   })
 
   describe('toJSON serialization', () => {
