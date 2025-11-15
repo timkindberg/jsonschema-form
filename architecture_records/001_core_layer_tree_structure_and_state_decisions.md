@@ -33,30 +33,32 @@ Core's primary job is to parse a JSON Schema and produce a **navigable tree stru
 #### Node Types
 
 ```typescript
-type NodeType = 'root' | 'group' | 'field'
+type NodeType = 'group' | 'field'
 ```
 
 **Field Node** (leaf): Represents a single form input
-- Contains: path, widget type, required flag, HTML attrs, schema reference
+- Contains: path, widget type, required flag, HTML attrs, label, description, schema reference
 - Example: An email input, a number field, a text area
 
-**Group Node** (branch): Represents a nested object
-- Contains: path, title, description, required flag, children
+**Group Node** (branch): Represents a nested object or the root form
+- Contains: path, label, description, required flag, children
 - Can contain Fields or other Groups
-- Example: An "address" object with street/city fields
-- Rationale: Objects in JSON Schema can have their own metadata (title, description, required status), so they deserve their own node type
+- Has query methods: `getField(path)`, `getAllFields()`, `toJSON()`
+- Example: An "address" object with street/city fields, or the root form (path: '')
+- Rationale: Objects in JSON Schema can have their own metadata (label, description, required status), so they deserve their own node type
 
-**Root Node**: Top-level container
-- Contains: children, query methods
-- Provides both tree traversal and flat access patterns
+**Root is just a GroupNode** with `path: ''`. There is no special "RootNode" type. This unification:
+- Simplifies the API (fewer types to learn)
+- Makes groups composable (any group can be treated as a mini-form)
+- Enables consistent querying at any level
 
 ### Tree Traversal Patterns
 
-Users can work with the tree in two ways:
+Users can work with the tree in multiple ways:
 
 ```typescript
-// Pattern 1: Tree walking (preserves hierarchy)
-form.root.children.forEach(node => {
+// Pattern 1: Direct children access
+form.children.forEach(node => {
   if (node.nodeType === 'group') {
     // Render a fieldset
     node.children.forEach(field => {
@@ -65,10 +67,21 @@ form.root.children.forEach(node => {
   }
 })
 
-// Pattern 2: Flat access (convenience)
+// Pattern 2: Query by relative path
+form.getField('name') // => Field at root level
+form.getField('address.street') // => Nested field
+
+// Pattern 3: Query from any group (RELATIVE paths)
+const addressGroup = form.children.find(n => n.path === 'address')
+addressGroup.getField('street') // => Finds 'address.street'
+addressGroup.getField('city') // => Finds 'address.city'
+
+// Pattern 4: Flatten to all fields
 form.getAllFields() // => Array of all leaf fields
-form.getField('address.street') // => Direct path access
+addressGroup.getAllFields() // => Only descendants of this group
 ```
+
+**Key: Queries are relative to the calling group.** This enables composability - groups can be passed around without needing to know their parent path.
 
 ### Widget Determination
 
@@ -112,6 +125,17 @@ We considered tightly coupling validation to Core or framework layers.
 
 **Why not:** Validation libraries (AJV, etc.) are framework-agnostic. They should be side-loaded plugins that work at any layer, not forced into our architecture. AJV is a large lib and there might be lighter alternatives.
 
+### ❌ Boolean Schemas (the schema itself is `true`/`false`)
+JSON Schema allows schemas to be boolean values: `true` (accept anything) or `false` (reject everything).
+
+**Why not:** Edge case with unclear UI implications. What would we render?
+- `true` → Maybe a free-form JSON editor?
+- `false` → Nothing? Disabled form?
+
+We throw an error for these currently. Can revisit if there's a real use case.
+
+**Note:** We DO support `type: 'boolean'` for checkbox fields. That's different from the schema itself being a boolean.
+
 ## Type System Decisions
 
 ### JSON Schema Types
@@ -132,6 +156,27 @@ export type { JSONSchema } from 'json-schema-typed/draft-07'
 ```
 
 This allows consumers to import from our package without knowing our internal dependencies.
+
+### Type Challenges
+
+**Problem:** `json-schema-typed` defines `JSONSchema` as potentially `boolean` (for `true`/`false` schemas in draft-07). This causes TypeScript errors when accessing properties like `type`, `properties`, etc.
+
+**Solution:** Created a helper type `JSONSchemaObject`:
+```typescript
+type JSONSchemaObject = Exclude<JSONSchema, boolean>
+```
+
+Used in function signatures where we know we have an object schema, not a boolean. We throw an error for boolean schemas (edge case we don't support yet).
+
+### Naming Decisions
+
+**Field labels:** We use `label` instead of `title` in our node types, even though JSON Schema uses `title`. 
+
+**Rationale:** 
+- "Label" is clearer for form field labels
+- Avoids confusion with document/page titles
+- Maps directly to `<label>` elements
+- We still extract from `schema.title`, just rename in our API
 
 ## Development Approach
 
@@ -170,20 +215,40 @@ These are things we're still figuring out:
 
 5. **Form library integration:** What's the exact handoff between Core structure and React Hook Form (or others)?
 
-## Next Steps
+## Implementation Status
 
-Current focus: **Core Layer MVP**
-- [ ] Implement `parseSchema()` function
-- [ ] Handle basic field types (string, number)
-- [ ] Handle nested objects (GroupNode)
-- [ ] Implement tree traversal methods
-- [ ] Add tests
+### ✅ Completed: Core Layer MVP
 
-Future exploration:
-- React layer API design
+**What we built:**
+- ✅ `parseSchema()` function (178 lines)
+- ✅ Basic field types (string, number with constraints)
+- ✅ Nested objects as GroupNodes
+- ✅ Tree traversal methods (getField, getAllFields with relative paths)
+- ✅ HTML attribute generation (type, min, max, pattern, required, etc.)
+- ✅ 25 comprehensive unit tests (all passing)
+- ✅ Vitest setup for testing
+- ✅ Working example app demonstrating tree walking and rendering
+
+**Key Features:**
+- Field nodes with widget type and computed HTML attrs
+- Group nodes for nested objects with composable queries
+- Root is GroupNode with empty path (unified API)
+- Relative path queries for composability
+- JSON serialization without circular references
+
+### Next Steps
+
+**Immediate priorities:**
+- More field types (boolean, enum/select, textarea, date)
+- Array support (repeating fields)
+- UISchema support for customization hints
+
+**Future exploration:**
+- React layer API design (hooks-based, TanStack-style)
 - React Hook Form integration
-- UI library layer patterns
-- Validation library integration
+- UI library layer patterns (Tailwind, Shadcn, etc.)
+- Validation library integration (AJV, Zod, Valibot)
+- Schema resolution ($ref, allOf, anyOf, oneOf)
 
 ---
 
