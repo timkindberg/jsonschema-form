@@ -15,7 +15,6 @@ export type {
   BaseNode,
   FieldNode,
   GroupNode,
-  RootNode,
 } from './types';
 
 // Export main parser

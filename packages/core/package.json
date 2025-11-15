@@ -17,7 +17,9 @@
   ],
   "scripts": {
     "build": "echo 'Build script not yet configured'",
-    "test": "echo 'Test script not yet configured'",
+    "test": "vitest",
+    "test:watch": "vitest --watch",
+    "test:ui": "vitest --ui",
     "clean": "rm -rf dist"
   },
   "keywords": [
@@ -29,7 +31,8 @@
   "author": "Tim Kindberg",
   "license": "MIT",
   "devDependencies": {
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^4.0.9"
   },
   "dependencies": {
     "json-schema-typed": "^8.0.1"

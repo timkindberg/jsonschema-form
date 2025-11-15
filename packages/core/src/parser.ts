@@ -1,4 +1,4 @@
-import type { JSONSchema, RootNode, FieldNode, GroupNode } from './types';
+import type { JSONSchema, FieldNode, GroupNode } from './types';
 
 // JSONSchema can be a boolean in draft-07, but we only work with object schemas
 type JSONSchemaObject = Exclude<JSONSchema, boolean>;
@@ -8,33 +8,13 @@ function isObjectSchema(schema: JSONSchema): schema is JSONSchemaObject {
   return typeof schema === 'object' && schema !== null;
 }
 
-export function parseSchema(schema: JSONSchema): RootNode {
+export function parseSchema(schema: JSONSchema): GroupNode {
   if (!isObjectSchema(schema)) {
     throw new Error('Boolean schemas are not yet supported');
   }
-  const children: Array<FieldNode | GroupNode> = [];
-
-  if (schema.type === 'object' && schema.properties) {
-    const requiredFields = schema.required || [];
-    
-    for (const [key, propSchema] of Object.entries(schema.properties)) {
-      if (!isObjectSchema(propSchema)) continue; // Skip boolean schemas
-      
-      const path = key;
-      const isRequired = requiredFields.includes(key);
-      
-      // Check if it's a nested object
-      if (propSchema.type === 'object' && propSchema.properties) {
-        // It's a group
-        children.push(createGroupNode(path, propSchema, isRequired));
-      } else {
-        // It's a field
-        children.push(createFieldNode(path, propSchema, isRequired));
-      }
-    }
-  }
-
-  return createRootNode(children);
+  
+  // Root is just a GroupNode with empty path
+  return createGroupNode('', schema, false);
 }
 
 function createFieldNode(
@@ -46,7 +26,7 @@ function createFieldNode(
     nodeType: 'field',
     path,
     schema,
-    title: schema.title,
+    label: schema.title,
     description: schema.description,
     required,
     widget: 'input', // Default for now
@@ -66,7 +46,7 @@ function createGroupNode(
     for (const [key, propSchema] of Object.entries(schema.properties)) {
       if (!isObjectSchema(propSchema)) continue; // Skip boolean schemas
       
-      const childPath = `${path}.${key}`;
+      const childPath = path ? `${path}.${key}` : key; // Handle root path
       const isRequired = requiredFields.includes(key);
       
       if (propSchema.type === 'object' && propSchema.properties) {
@@ -81,54 +61,48 @@ function createGroupNode(
     nodeType: 'group',
     path,
     schema,
-    title: schema.title,
+    label: schema.title,
     description: schema.description,
     required,
     widget: 'fieldset',
     children,
-    getChild(name: string) {
-      return children.find(child => child.path === `${path}.${name}` || child.path === name);
-    },
-    getChildren() {
-      return children;
-    },
-  };
-}
-
-function createRootNode(children: Array<FieldNode | GroupNode>): RootNode {
-  return {
-    nodeType: 'root',
-    children,
     
-    getField(path: string): FieldNode | undefined {
-      // Flatten all fields and find by path
-      const allFields = this.getAllFields();
-      return allFields.find(field => field.path === path);
+    getField(targetPath: string): FieldNode | undefined {
+      // Search descendants relative to this group
+      // If this group has path 'address', searching for 'street' finds 'address.street'
+      const fullPath = path ? `${path}.${targetPath}` : targetPath;
+      
+      for (const child of children) {
+        if (child.nodeType === 'field' && child.path === fullPath) {
+          return child;
+        } else if (child.nodeType === 'group') {
+          // Check if target is within this child group
+          if (fullPath.startsWith(child.path + '.') || fullPath === child.path) {
+            const relativePath = fullPath.substring(child.path.length + 1);
+            const found = child.getField(relativePath);
+            if (found) return found;
+          }
+        }
+      }
+      return undefined;
     },
     
     getAllFields(): FieldNode[] {
       const fields: FieldNode[] = [];
       
-      function collectFields(nodes: Array<FieldNode | GroupNode>) {
-        for (const node of nodes) {
-          if (node.nodeType === 'field') {
-            fields.push(node);
-          } else if (node.nodeType === 'group') {
-            collectFields(node.children);
-          }
+      for (const child of children) {
+        if (child.nodeType === 'field') {
+          fields.push(child);
+        } else if (child.nodeType === 'group') {
+          fields.push(...child.getAllFields());
         }
       }
       
-      collectFields(children);
       return fields;
     },
     
     toJSON() {
-      // Serialize without functions and avoid circular refs
-      return {
-        nodeType: this.nodeType,
-        children: this.children.map(child => serializeNode(child)),
-      };
+      return serializeNode(this);
     },
   };
 }
@@ -139,7 +113,7 @@ function serializeNode(node: FieldNode | GroupNode): object {
     return {
       nodeType: node.nodeType,
       path: node.path,
-      title: node.title,
+      title: node.label,
       description: node.description,
       required: node.required,
       widget: node.widget,
@@ -150,7 +124,7 @@ function serializeNode(node: FieldNode | GroupNode): object {
     return {
       nodeType: node.nodeType,
       path: node.path,
-      title: node.title,
+      title: node.label,
       description: node.description,
       required: node.required,
       widget: node.widget,

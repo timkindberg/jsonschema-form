@@ -3,13 +3,13 @@ import type { JSONSchema } from 'json-schema-typed/draft-07'
 
 export type { JSONSchema }
 
-export type NodeType = 'root' | 'group' | 'field'
+export type NodeType = 'group' | 'field'
 
 export interface BaseNode {
   nodeType: NodeType
   path: string  // dot notation: 'user.address.street'
   schema: JSONSchema  // the raw schema chunk
-  title?: string
+  label?: string
   description?: string
 }
 
@@ -26,20 +26,11 @@ export interface GroupNode extends BaseNode {
   required: boolean
   children: Array<FieldNode | GroupNode>
   
-  // Methods
-  getChild(name: string): FieldNode | GroupNode | undefined
-  getChildren(): Array<FieldNode | GroupNode>
-}
-
-export interface RootNode {
-  nodeType: 'root'
-  children: Array<FieldNode | GroupNode>
-  
-  // Query methods
+  // Query methods - search descendants only
   getField(path: string): FieldNode | undefined
   getAllFields(): FieldNode[]
   
-  // Maybe
+  // Serialization
   toJSON(): object
 }
 

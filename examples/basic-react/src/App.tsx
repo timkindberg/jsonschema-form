@@ -60,7 +60,7 @@ function App() {
                     fontWeight: node.required ? 'bold' : 'normal'
                   }}
                 >
-                  {node.title || node.path}
+                  {node.label || node.path}
                   {node.required && <span style={{ color: 'red' }}> *</span>}
                 </label>
 
@@ -89,7 +89,7 @@ function App() {
             return (
               <fieldset key={node.path} style={{ marginBottom: '1.5rem', padding: '1rem', border: '2px solid #eee' }}>
                 <legend style={{ fontWeight: 'bold' }}>
-                  {node.title || node.path}
+                  {node.label || node.path}
                 </legend>
                 {node.children.map((childNode) => {
                   if (childNode.nodeType === 'field') {
@@ -99,7 +99,7 @@ function App() {
                           htmlFor={childNode.path}
                           style={{ display: 'block', marginBottom: '0.5rem' }}
                         >
-                          {childNode.title || childNode.path}
+                          {childNode.label || childNode.path}
                           {childNode.required && <span style={{ color: 'red' }}> *</span>}
                         </label>
                         <input
