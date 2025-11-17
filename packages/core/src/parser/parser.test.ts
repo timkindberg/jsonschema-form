@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { parseSchema } from '../src/parser'
-import type { JSONSchema, GroupNode } from '../src/types'
+import { parseSchema } from './index'
+import type { JSONSchema, GroupNode } from '../types'
 
 describe('parseSchema', () => {
   describe('basic object schemas', () => {
@@ -106,7 +106,7 @@ describe('parseSchema', () => {
       const form = parseSchema(schema)
       const field = form.getField('name')
 
-      expect(field?.parts.input.attrs.type).toBe('text')
+      expect(field?.parts.input?.attrs.type).toBe('text')
     })
 
     it('generates email input type for email format', () => {
@@ -120,7 +120,7 @@ describe('parseSchema', () => {
       const form = parseSchema(schema)
       const field = form.getField('email')
 
-      expect(field?.parts.input.attrs.type).toBe('email')
+      expect(field?.parts.input?.attrs.type).toBe('email')
     })
 
     it('generates number input type for numbers', () => {
@@ -134,7 +134,7 @@ describe('parseSchema', () => {
       const form = parseSchema(schema)
       const field = form.getField('age')
 
-      expect(field?.parts.input.attrs.type).toBe('number')
+      expect(field?.parts.input?.attrs.type).toBe('number')
     })
 
     it('generates checkbox input type for booleans', () => {
@@ -148,7 +148,7 @@ describe('parseSchema', () => {
       const form = parseSchema(schema)
       const field = form.getField('subscribe')
 
-      expect(field?.parts.input.attrs.type).toBe('checkbox')
+      expect(field?.parts.input?.attrs.type).toBe('checkbox')
     })
 
     it('includes required attribute for required fields', () => {
@@ -163,7 +163,7 @@ describe('parseSchema', () => {
       const form = parseSchema(schema)
       const field = form.getField('name')
 
-      expect(field?.parts.input.attrs.required).toBe(true)
+      expect(field?.parts.input?.attrs.required).toBe(true)
     })
 
     it('includes min/max attributes for number constraints', () => {
@@ -177,8 +177,8 @@ describe('parseSchema', () => {
       const form = parseSchema(schema)
       const field = form.getField('age')
 
-      expect(field?.parts.input.attrs.min).toBe(0)
-      expect(field?.parts.input.attrs.max).toBe(120)
+      expect(field?.parts.input?.attrs.min).toBe(0)
+      expect(field?.parts.input?.attrs.max).toBe(120)
     })
 
     it('includes minLength/maxLength for string constraints', () => {
@@ -192,8 +192,8 @@ describe('parseSchema', () => {
       const form = parseSchema(schema)
       const field = form.getField('username')
 
-      expect(field?.parts.input.attrs.minLength).toBe(3)
-      expect(field?.parts.input.attrs.maxLength).toBe(20)
+      expect(field?.parts.input?.attrs.minLength).toBe(3)
+      expect(field?.parts.input?.attrs.maxLength).toBe(20)
     })
 
     it('includes pattern attribute', () => {
@@ -207,7 +207,7 @@ describe('parseSchema', () => {
       const form = parseSchema(schema)
       const field = form.getField('zipcode')
 
-      expect(field?.parts.input.attrs.pattern).toBe('^[0-9]{5}$')
+      expect(field?.parts.input?.attrs.pattern).toBe('^[0-9]{5}$')
     })
   })
 
@@ -1071,7 +1071,7 @@ describe('parseSchema', () => {
       expect(field?.parts.description?.text).toBe(
         'I agree to the terms and conditions'
       )
-      expect(field?.parts.input.attrs.type).toBe('checkbox')
+      expect(field?.parts.input?.attrs.type).toBe('checkbox')
     })
 
     it('handles required boolean fields', () => {
@@ -1087,7 +1087,7 @@ describe('parseSchema', () => {
       const field = form.getField('terms')
 
       expect(field?.validation.required).toBe(true)
-      expect(field?.parts.input.attrs.required).toBe(true)
+      expect(field?.parts.input?.attrs.required).toBe(true)
       expect(field?.parts.label.showRequired).toBe(true)
     })
 
@@ -1106,12 +1106,12 @@ describe('parseSchema', () => {
       const allFields = form.getAllFields()
 
       expect(allFields).toHaveLength(4)
-      expect(form.getField('name')?.parts.input.attrs.type).toBe('text')
-      expect(form.getField('age')?.parts.input.attrs.type).toBe('number')
-      expect(form.getField('subscribe')?.parts.input.attrs.type).toBe(
+      expect(form.getField('name')?.parts.input?.attrs.type).toBe('text')
+      expect(form.getField('age')?.parts.input?.attrs.type).toBe('number')
+      expect(form.getField('subscribe')?.parts.input?.attrs.type).toBe(
         'checkbox'
       )
-      expect(form.getField('terms')?.parts.input.attrs.type).toBe('checkbox')
+      expect(form.getField('terms')?.parts.input?.attrs.type).toBe('checkbox')
     })
 
     it('includes boolean fields in parts API correctly', () => {
@@ -1175,11 +1175,10 @@ describe('parseSchema', () => {
       const emailField = form.getField('preferences.emailNotifications')
       const smsField = form.getField('preferences.smsNotifications')
 
-      expect(emailField?.parts.input.attrs.type).toBe('checkbox')
+      expect(emailField?.parts.input?.attrs.type).toBe('checkbox')
       expect(emailField?.validation.required).toBe(true)
-      expect(smsField?.parts.input.attrs.type).toBe('checkbox')
+      expect(smsField?.parts.input?.attrs.type).toBe('checkbox')
       expect(smsField?.validation.required).toBe(false)
     })
   })
-
 })
