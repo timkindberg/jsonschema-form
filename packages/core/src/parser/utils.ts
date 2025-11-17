@@ -58,6 +58,12 @@ export function walkNode<R>(
     throw new Error('walk() requires handlers on first call')
   }
 
+  // If this is the root node and a root handler is provided, use it
+  if (node.isRoot && effectiveHandlers.root && !inheritedHandlers) {
+    const result = effectiveHandlers.root(node)
+    return [result]
+  }
+
   const results: R[] = []
 
   for (const child of node.children) {

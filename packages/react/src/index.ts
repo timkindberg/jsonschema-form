@@ -4,5 +4,12 @@
  * React adapter for JSON Schema forms.
  */
 
-// Placeholder - to be implemented
 export const VERSION = '0.0.0'
+
+// Default component renderers
+export { DefaultRoot } from './DefaultRoot'
+export { DefaultField } from './DefaultField'
+export { DefaultGroup } from './DefaultGroup'
+export type { DefaultRootProps } from './DefaultRoot'
+export type { DefaultFieldProps } from './DefaultField'
+export type { DefaultGroupProps } from './DefaultGroup'
