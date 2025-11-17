@@ -82,11 +82,6 @@ function App() {
 
         <button type="submit">Submit</button>
       </form>
-
-      <details>
-        <summary>View Parsed Structure (JSON)</summary>
-        <pre>{JSON.stringify(form.toJSON(), null, 2)}</pre>
-      </details>
     </div>
   )
 }
