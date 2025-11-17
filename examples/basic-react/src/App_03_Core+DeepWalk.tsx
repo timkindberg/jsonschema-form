@@ -108,10 +108,10 @@ function App() {
             </div>
           ),
 
-          group: (node) => {
+          group: (node, handlers) => {
             // Skip rendering the root group (empty path)
             if (node.path === '') {
-              return <div key="root">{node.walk()}</div>
+              return <div key="root">{node.walk(handlers)}</div>
             }
 
             // Render nested groups as fieldsets
@@ -131,8 +131,8 @@ function App() {
                   {node.parts.label?.text || node.path}{' '}
                   {depth > 1 && <small>(nested level {depth})</small>}
                 </legend>
-                {/* Handlers automatically inherit to nested walk() calls */}
-                {node.walk()}
+                {/* Handlers passed through to nested walk() calls */}
+                {node.walk(handlers)}
               </fieldset>
             )
           },
@@ -140,11 +140,6 @@ function App() {
 
         <button type="submit">Submit</button>
       </form>
-
-      <details>
-        <summary>View Parsed Structure (JSON)</summary>
-        <pre>{JSON.stringify(form.toJSON(), null, 2)}</pre>
-      </details>
     </div>
   )
 }
