@@ -1221,6 +1221,247 @@ describe('parseSchema', () => {
         }
       }).toThrow('submit() can only be called on root GroupNode')
     })
+
+    it('ensures multiselect fields always return arrays (single value)', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          skills: {
+            type: 'array',
+            items: {
+              type: 'string',
+              enum: ['JavaScript', 'TypeScript', 'React'],
+            },
+          },
+        },
+      }
+
+      const form = parseSchema(schema)
+      let submittedData: Record<string, unknown> | null = null
+      const handleSubmit = form.submit((data) => {
+        submittedData = data
+      })
+
+      // Simulate form submission with a single selected value
+      const mockFormData = new Map([['skills', 'JavaScript']])
+      const mockEvent = {
+        preventDefault: () => {},
+        currentTarget: {
+          entries: () => mockFormData.entries(),
+        } as unknown as HTMLFormElement,
+      }
+
+      // Mock FormData
+      const originalFormData = global.FormData
+      global.FormData = class MockFormData {
+        entries() {
+          return mockFormData.entries()
+        }
+      } as unknown as typeof FormData
+
+      handleSubmit(mockEvent as { preventDefault(): void; currentTarget: EventTarget | null })
+
+      global.FormData = originalFormData
+
+      expect(submittedData).toEqual({
+        skills: ['JavaScript'], // Should be array, not single value
+      })
+    })
+
+    it('ensures multiselect fields return arrays (multiple values)', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          skills: {
+            type: 'array',
+            items: {
+              type: 'string',
+              enum: ['JavaScript', 'TypeScript', 'React'],
+            },
+          },
+        },
+      }
+
+      const form = parseSchema(schema)
+      let submittedData: Record<string, unknown> | null = null
+      const handleSubmit = form.submit((data) => {
+        submittedData = data
+      })
+
+      // Simulate form submission with multiple selected values
+      const mockFormData = new Map([
+        ['skills', 'JavaScript'],
+        ['skills', 'TypeScript'],
+      ])
+      const mockEvent = {
+        preventDefault: () => {},
+        currentTarget: {
+          entries: () => mockFormData.entries(),
+        } as unknown as HTMLFormElement,
+      }
+
+      // Mock FormData
+      const originalFormData = global.FormData
+      global.FormData = class MockFormData {
+        entries() {
+          return mockFormData.entries()
+        }
+      } as unknown as typeof FormData
+
+      handleSubmit(mockEvent as { preventDefault(): void; currentTarget: EventTarget | null })
+
+      global.FormData = originalFormData
+
+      expect(submittedData).toEqual({
+        skills: ['JavaScript', 'TypeScript'], // Should be array
+      })
+    })
+
+    it('ensures multiselect fields with oneOf return arrays (single value)', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          colors: {
+            type: 'array',
+            items: {
+              oneOf: [
+                { const: 'red', title: 'Red' },
+                { const: 'blue', title: 'Blue' },
+                { const: 'green', title: 'Green' },
+              ],
+            },
+          },
+        },
+      }
+
+      const form = parseSchema(schema)
+      let submittedData: Record<string, unknown> | null = null
+      const handleSubmit = form.submit((data) => {
+        submittedData = data
+      })
+
+      // Simulate form submission with a single selected value from oneOf
+      const mockFormData = new Map([['colors', 'red']])
+      const mockEvent = {
+        preventDefault: () => {},
+        currentTarget: {
+          entries: () => mockFormData.entries(),
+        } as unknown as HTMLFormElement,
+      }
+
+      // Mock FormData
+      const originalFormData = global.FormData
+      global.FormData = class MockFormData {
+        entries() {
+          return mockFormData.entries()
+        }
+      } as unknown as typeof FormData
+
+      handleSubmit(mockEvent as { preventDefault(): void; currentTarget: EventTarget | null })
+
+      global.FormData = originalFormData
+
+      expect(submittedData).toEqual({
+        colors: ['red'], // Should be array, not single value
+      })
+    })
+
+    it('multiselect fields with no selections do not appear in submitted data', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          skills: {
+            type: 'array',
+            items: {
+              type: 'string',
+              enum: ['JavaScript', 'TypeScript', 'React'],
+            },
+          },
+        },
+      }
+
+      const form = parseSchema(schema)
+      let submittedData: Record<string, unknown> | null = null
+      const handleSubmit = form.submit((data) => {
+        submittedData = data
+      })
+
+      // Simulate form submission with no multiselect values (field not in FormData)
+      const mockFormData = new Map([['name', 'John']])
+      const mockEvent = {
+        preventDefault: () => {},
+        currentTarget: {
+          entries: () => mockFormData.entries(),
+        } as unknown as HTMLFormElement,
+      }
+
+      // Mock FormData
+      const originalFormData = global.FormData
+      global.FormData = class MockFormData {
+        entries() {
+          return mockFormData.entries()
+        }
+      } as unknown as typeof FormData
+
+      handleSubmit(mockEvent as { preventDefault(): void; currentTarget: EventTarget | null })
+
+      global.FormData = originalFormData
+
+      // When no values are selected, the field doesn't appear in FormData
+      // So it won't be in the submitted data (not even as empty array)
+      expect(submittedData).toEqual({
+        name: 'John',
+      })
+    })
+
+    it('ensures dynamic array fields return arrays', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        properties: {
+          hobbies: {
+            type: 'array',
+            items: {
+              type: 'string',
+            },
+          },
+        },
+      }
+
+      const form = parseSchema(schema)
+      let submittedData: Record<string, unknown> | null = null
+      const handleSubmit = form.submit((data) => {
+        submittedData = data
+      })
+
+      // Simulate form submission with array items
+      const mockFormData = new Map([
+        ['hobbies.0', 'reading'],
+        ['hobbies.1', 'coding'],
+      ])
+      const mockEvent = {
+        preventDefault: () => {},
+        currentTarget: {
+          entries: () => mockFormData.entries(),
+        } as unknown as HTMLFormElement,
+      }
+
+      // Mock FormData
+      const originalFormData = global.FormData
+      global.FormData = class MockFormData {
+        entries() {
+          return mockFormData.entries()
+        }
+      } as unknown as typeof FormData
+
+      handleSubmit(mockEvent as { preventDefault(): void; currentTarget: EventTarget | null })
+
+      global.FormData = originalFormData
+
+      expect(submittedData).toEqual({
+        hobbies: ['reading', 'coding'], // Should be array
+      })
+    })
   })
 
   describe('array fields - multiselect', () => {

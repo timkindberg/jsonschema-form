@@ -148,6 +148,27 @@ export function createGroupNode(
 
         const formData = new FormData(target)
 
+        // Identify all array fields (multiselect and dynamic arrays)
+        const arrayFieldPaths = new Set<string>()
+        groupNode.walk({
+          field(fieldNode) {
+            // Multiselect fields should always return arrays
+            if (fieldNode.widget === 'multiselect') {
+              arrayFieldPaths.add(fieldNode.path)
+            }
+          },
+          arrayItem(itemNode) {
+            // Dynamic array items - their parent array path should be tracked
+            // Extract array path from item path (e.g., "hobbies.0" -> "hobbies")
+            const itemPath = itemNode.path
+            const lastDotIndex = itemPath.lastIndexOf('.')
+            if (lastDotIndex !== -1) {
+              const arrayPath = itemPath.substring(0, lastDotIndex)
+              arrayFieldPaths.add(arrayPath)
+            }
+          },
+        })
+
         // Collect all values, handling multiselect (multiple entries with same name)
         const flat: Record<string, unknown> = {}
         for (const [key, value] of formData.entries()) {
@@ -160,6 +181,13 @@ export function createGroupNode(
             }
           } else {
             flat[key] = value
+          }
+        }
+
+        // Ensure array fields are always arrays, even with single values
+        for (const arrayPath of arrayFieldPaths) {
+          if (arrayPath in flat && !Array.isArray(flat[arrayPath])) {
+            flat[arrayPath] = [flat[arrayPath]]
           }
         }
 
