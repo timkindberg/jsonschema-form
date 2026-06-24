@@ -2,11 +2,19 @@
 //
 // The recursion, enrichment, and scoping live in Core (`createContinuation`).
 // This file is the **R = ReactNode** renderer set: per-part defaults as JSX, a
-// `root` composer per node kind, and `combine` = a keyed fragment. There is no
-// Context here — the engine threads the active resolver as a parameter and each
-// node's `Default`/`Children` closes over it, so a lazily-rendered
-// `<node.Default/>` still sees the right (possibly scoped) resolver. The vanilla
-// probe (ADR 008) proved Context was incidental; conformance keeps them honest.
+// `root` composer per node kind, and `combine` = a keyed fragment.
+//
+// Continuation handles are **called, not mounted** — `{node.Default()}`,
+// `{node.Children()}`, `{part.Default()}` — exactly as the vanilla oracle calls
+// them (ADR 015). A handle is a per-render closure; mounting one as `<x.Default/>`
+// makes a *fresh component type every render*, so any real re-render remounts the
+// subtree and discards uncontrolled DOM (typed values). Calling instead yields
+// markup composed only of module-level component types (`NodeRenderer`,
+// `ArrayRoot`, `PartHost`, the intrinsic elements), which reconcile in place. The
+// engine threads the active resolver as a parameter and each handle closes over
+// it, so a called `node.Default()` still sees the right (possibly scoped)
+// resolver with no Context — the vanilla probe (ADR 008) proved Context was
+// incidental; conformance keeps them honest.
 //
 // Customization is by-reference over this set (ADR 013): spread `defaultAdapter`
 // and swap an entry, or hand `createRenderer` a partial set whose gaps fall back
@@ -53,7 +61,7 @@ import {
 // Public types — React instantiates the generic engine at R = ReactNode.
 // ---------------------------------------------------------------------------
 
-/** Per-node render hook: return custom JSX to hijack, or `<node.Default/>`. */
+/** Per-node render hook: return custom JSX to hijack, or `node.Default()`. */
 export type RenderNode = Resolver<ReactNode>
 export type ReactAdapter = RendererAdapter<ReactNode>
 export type ReactPartialAdapter = PartialAdapter<ReactNode>
@@ -127,23 +135,24 @@ function DefaultFieldRoot({
   node: EField
   overrides?: PartOverrideMap<ReactNode>
 }): ReactNode {
-  const renderPart = (
+  const renderSlot = (
     part: { Default(): ReactNode } | undefined,
     name: string
   ): ReactNode => {
     if (!part) return null
     const override = overrides?.[name]
-    return override ? override(part) : <part.Default />
+    // Call, never mount: `part.Default()` returns a stable `PartHost` element.
+    return override ? override(part) : part.Default()
   }
   // Narrowing on `widget` reaches the variant-specific control part (ADR 012).
   const control =
     node.widget === 'input'
-      ? renderPart(node.parts.input, 'input')
-      : renderPart(node.parts.select, 'select')
+      ? renderSlot(node.parts.input, 'input')
+      : renderSlot(node.parts.select, 'select')
   return (
     <div className="jsf-field">
-      {renderPart(node.parts.label, 'label')}
-      {renderPart(node.parts.description, 'description')}
+      {renderSlot(node.parts.label, 'label')}
+      {renderSlot(node.parts.description, 'description')}
       {control}
     </div>
   )
@@ -161,8 +170,8 @@ function DefaultGroupRoot({
   if (!label && !description) return <div className="jsf-group">{children}</div>
   return (
     <fieldset className="jsf-group">
-      {label && <label.Default />}
-      {description && <description.Default />}
+      {label && label.Default()}
+      {description && description.Default()}
       {children}
     </fieldset>
   )
@@ -280,8 +289,8 @@ function ArrayRoot({ node }: { node: EArray }): ReactNode {
 
   return (
     <fieldset className="jsf-array">
-      {label && <label.Default />}
-      {description && <description.Default />}
+      {label && label.Default()}
+      {description && description.Default()}
       <div className="jsf-array-items">
         {slots.map((slot) => (
           <ArrayItemActions key={slot.id} id={slot.id} remove={removeById}>
@@ -290,7 +299,7 @@ function ArrayRoot({ node }: { node: EArray }): ReactNode {
         ))}
       </div>
       <ArrayActionsContext.Provider value={addActions}>
-        <addButton.Default />
+        {addButton.Default()}
       </ArrayActionsContext.Provider>
     </fieldset>
   )
@@ -312,9 +321,23 @@ function DefaultArrayItemRoot({
   return (
     <div className="jsf-array-item">
       {children}
-      <node.parts.removeButton.Default />
+      {node.parts.removeButton.Default()}
     </div>
   )
+}
+
+/**
+ * Stable host for one part's default (the engine's `renderPart` seam). Every
+ * part renders through this ONE module-level component: the part's render thunk
+ * arrives as a prop, so across re-renders the host type is constant and React
+ * reconciles in place — it never remounts a per-render closure (which would
+ * discard an uncontrolled `<input>`'s value). It also gives the part its own
+ * fiber *below* whatever Provider its parent rendered, so a Context-reading part
+ * (the array add/remove buttons) sees the actions — calling the thunk inline in
+ * the parent would read Context from above that Provider and miss them.
+ */
+function PartHost({ render }: { render: () => ReactNode }): ReactNode {
+  return render()
 }
 
 const combine: ReactAdapter['combine'] = ({ children }) => (
@@ -437,7 +460,7 @@ export interface SchemaFieldsProps {
   children?: (root: EGroup) => ReactNode
 }
 
-const defaultResolver: RenderNode = (node) => <node.Default />
+const defaultResolver: RenderNode = (node) => node.Default()
 
 /**
  * The floor (ADR 013): bind a renderer set and get a `SchemaFields` component.
@@ -470,6 +493,7 @@ export function createRenderer(adapter: ReactPartialAdapter) {
 
   const engine: Continuation<ReactNode> = createContinuation<ReactNode>(merged, {
     renderChild: (core, resolver) => <NodeRenderer core={core} resolver={resolver} />,
+    renderPart: (render) => <PartHost render={render} />,
   })
 
   return function SchemaFields({

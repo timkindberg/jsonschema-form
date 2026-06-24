@@ -51,7 +51,7 @@ describe('SchemaFields', () => {
           node.isField && node.path === 'name' ? (
             <p>custom-name</p>
           ) : (
-            <node.Default />
+            node.Default()
           )
         }
       />
@@ -72,17 +72,15 @@ describe('SchemaFields', () => {
         renderNode={(node) => {
           // narrowing to the input variant exposes the `input` part override
           if (node.isField && node.widget === 'input' && node.path === 'name') {
-            return (
-              <node.Default
-                parts={{
-                  input: (input) => (
-                    <input {...input.attrs} data-testid="fancy-input" />
-                  ),
-                }}
-              />
-            )
+            return node.Default({
+              parts: {
+                input: (input) => (
+                  <input {...input.attrs} data-testid="fancy-input" />
+                ),
+              },
+            })
           }
-          return <node.Default />
+          return node.Default()
         }}
       />
     )
@@ -104,12 +102,12 @@ describe('SchemaFields', () => {
             const { label, input } = node.parts
             return (
               <div data-testid="hand-composed">
-                <input.Default />
-                <label.Default />
+                {input.Default()}
+                {label.Default()}
               </div>
             )
           }
-          return <node.Default />
+          return node.Default()
         }}
       />
     )
@@ -128,9 +126,9 @@ describe('SchemaFields', () => {
       <SchemaFields form={form}>
         {(root) => (
           <>
-            <root.children.color.Default />
+            {root.children.color.Default()}
             <p>in-between</p>
-            <root.children.name.Default />
+            {root.children.name.Default()}
           </>
         )}
       </SchemaFields>
@@ -151,17 +149,16 @@ describe('SchemaFields', () => {
       <SchemaFields form={form}>
         {(root) => {
           const address = root.children.address
-          return address.isGroup ? (
-            <address.Default
-              renderNode={(node) =>
-                node.isField && node.path === 'address.street' ? (
-                  <p>scoped-street</p>
-                ) : (
-                  <node.Default />
-                )
-              }
-            />
-          ) : null
+          return address.isGroup
+            ? address.Default({
+                renderNode: (node) =>
+                  node.isField && node.path === 'address.street' ? (
+                    <p>scoped-street</p>
+                  ) : (
+                    node.Default()
+                  ),
+              })
+            : null
         }}
       </SchemaFields>
     )
