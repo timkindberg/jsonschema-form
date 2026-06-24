@@ -233,9 +233,19 @@ export interface Continuation<R> {
  * memoized per-node component that calls back into `resolve`, so a state change
  * re-renders only the nodes that changed and uncontrolled DOM keeps its
  * identity. Output must match the eager fold — conformance is a markup contract.
+ *
+ * `renderPart` is the matching seam for *one* part's default. The string fold
+ * just invokes the thunk (the default). React wraps it in a stable host
+ * component so the part reconciles in place — never define-and-mount a fresh
+ * closure per render (that remounts the part, discarding uncontrolled DOM and
+ * its value), and so any Context the part reads (the array add/remove actions)
+ * is read inside the host, below its Provider. Both seams exist for the same
+ * reason: continuation handles are *called*, and the call site must yield a
+ * stable component type, not a per-render one. Output must match the eager fold.
  */
 export interface ContinuationOptions<R> {
   renderChild?(core: AnyNode, resolver: Resolver<R>): R
+  renderPart?(render: () => R): R
 }
 
 // ---------------------------------------------------------------------------
@@ -283,7 +293,9 @@ export function createContinuation<R>(
               Default: () => {
                 const renderer = partRenderer(kind, name)
                 // Unrendered parts (e.g. `container`, array buttons) → empty `R`.
-                return renderer ? renderer(data) : adapter.combine({ children: [] })
+                const run = (): R =>
+                  renderer ? renderer(data) : adapter.combine({ children: [] })
+                return options.renderPart ? options.renderPart(run) : run()
               },
             }
           : data

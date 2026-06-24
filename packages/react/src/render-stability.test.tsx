@@ -52,4 +52,40 @@ describe('render stability', () => {
     const after = document.querySelector('input')
     expect(after).toBe(before)
   })
+
+  // The sharper case: a node that ACTUALLY re-renders (not a memo bail) must
+  // still reconcile in place. A consumer that inlines `renderNode` hands a new
+  // closure every parent render, so the resolver prop changes and every
+  // NodeRenderer re-renders — the realistic trigger. A correct tree (stable
+  // module-level component types, data via props) keeps the uncontrolled input
+  // mounted; the old `<node.Default/>` (a per-render closure mounted as a fresh
+  // component type) remounts it and discards the value.
+  it('an inlined renderNode (new identity each render) does not remount fields', async () => {
+    const form = jsonSchemaToTree(schema)
+
+    function Parent() {
+      const [n, setN] = useState(0)
+      return (
+        <div>
+          <button type="button" onClick={() => setN((x) => x + 1)}>
+            bump {n}
+          </button>
+          {/* fresh closure every render → resolver prop changes → real re-render */}
+          <SchemaFields form={form} renderNode={(node) => node.Default()} />
+        </div>
+      )
+    }
+
+    const screen = await render(<Parent />)
+    const name = screen.getByRole('textbox', { name: 'Name' })
+    await name.fill('hello')
+    await expect.element(name).toHaveValue('hello')
+
+    const before = document.querySelector('input')
+    await screen.getByRole('button', { name: /bump/ }).click()
+
+    await expect.element(name).toHaveValue('hello')
+    const after = document.querySelector('input')
+    expect(after).toBe(before)
+  })
 })

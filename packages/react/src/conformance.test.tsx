@@ -191,11 +191,9 @@ const overrideCases: OverrideCase[] = [
     schema: overrideSchema,
     react: (node) =>
       node.isField ? (
-        <section data-jsf-wrap="field">
-          <node.Default />
-        </section>
+        <section data-jsf-wrap="field">{node.Default()}</section>
       ) : (
-        <node.Default />
+        node.Default()
       ),
     vanilla: (node) =>
       node.isField
@@ -209,12 +207,12 @@ const overrideCases: OverrideCase[] = [
       if (node.isField && node.path === 'name' && node.widget === 'input') {
         return (
           <div className="hand">
-            <node.parts.label.Default />
-            <node.parts.input.Default />
+            {node.parts.label.Default()}
+            {node.parts.input.Default()}
           </div>
         )
       }
-      return <node.Default />
+      return node.Default()
     },
     vanilla: (node) => {
       if (node.isField && node.path === 'name' && node.widget === 'input') {

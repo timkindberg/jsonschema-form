@@ -105,18 +105,16 @@ export default function App() {
               node.widget === 'input' &&
               node.path === 'email'
             )
-              return (
-                <node.Default
-                  parts={{
-                    label: (label) => (
-                      <span>
-                        <label.Default />
-                        <InfoTooltip text="we never share this" />
-                      </span>
-                    ),
-                  }}
-                />
-              )
+              return node.Default({
+                parts: {
+                  label: (label) => (
+                    <span>
+                      {label.Default()}
+                      <InfoTooltip text="we never share this" />
+                    </span>
+                  ),
+                },
+              })
 
             // replace ONLY the street input from its part data
             if (
@@ -124,11 +122,9 @@ export default function App() {
               node.widget === 'input' &&
               node.path === 'address.street'
             )
-              return (
-                <node.Default
-                  parts={{ input: (input) => <FancyInput {...input.attrs} /> }}
-                />
-              )
+              return node.Default({
+                parts: { input: (input) => <FancyInput {...input.attrs} /> },
+              })
 
             // place the city's parts yourself, custom layout
             if (
@@ -141,7 +137,7 @@ export default function App() {
                 <div
                   style={{ display: 'flex', gap: 8, alignItems: 'center' }}
                 >
-                  <input.Default /> <label.Default />
+                  {input.Default()} {label.Default()}
                 </div>
               )
             }
@@ -157,7 +153,7 @@ export default function App() {
                   }}
                 >
                   <h3 style={{ marginTop: 0 }}>Address (hijacked wrapper)</h3>
-                  <node.Children />
+                  {node.Children()}
                 </section>
               )
 
@@ -165,12 +161,12 @@ export default function App() {
             if (node.isGroup && node.path === 'address.location')
               return (
                 <div style={{ display: 'flex', gap: 12 }}>
-                  <node.children.longitude.Default />
-                  <node.children.latitude.Default />
+                  {node.children.longitude.Default()}
+                  {node.children.latitude.Default()}
                 </div>
               )
 
-            return <node.Default />
+            return node.Default()
           }}
         />
       </Section>
@@ -181,10 +177,10 @@ export default function App() {
             {(root) => (
               <>
                 <p style={{ color: '#666' }}>Custom top-level layout:</p>
-                <root.children.name.Default />
-                <root.children.email.Default />
+                {root.children.name.Default()}
+                {root.children.email.Default()}
                 <hr />
-                <root.children.address.Default />
+                {root.children.address.Default()}
                 <div style={{ marginTop: 12 }}>
                   <button type="submit">Submit</button>
                 </div>
@@ -209,33 +205,29 @@ export default function App() {
                 </p>
 
                 {/* static keyed children */}
-                <root.children.name.Default />
-                <root.children.email.Default />
+                {root.children.name.Default()}
+                {root.children.email.Default()}
 
                 {/* dynamic child by relative path */}
-                {theme && <theme.Default />}
+                {theme && theme.Default()}
 
                 {/* render address default, but inject a renderNode scoped to ITS subtree */}
-                {address.isGroup && (
-                  <address.Default
-                    renderNode={(node) => {
+                {address.isGroup &&
+                  address.Default({
+                    renderNode: (node) => {
                       // deep: tweak just the street label
                       if (
                         node.isField &&
                         node.widget === 'input' &&
                         node.path === 'address.street'
                       )
-                        return (
-                          <node.Default
-                            parts={{
-                              label: (label) => (
-                                <span>
-                                  📍 <label.Default />
-                                </span>
-                              ),
-                            }}
-                          />
-                        )
+                        return node.Default({
+                          parts: {
+                            label: (label) => (
+                              <span>📍 {label.Default()}</span>
+                            ),
+                          },
+                        })
                       // deeper: wrap the coordinates group and reorder its children
                       if (node.isGroup && node.path === 'address.location')
                         return (
@@ -248,15 +240,14 @@ export default function App() {
                           >
                             <strong>Coordinates</strong>
                             <div style={{ display: 'flex', gap: 12 }}>
-                              <node.children.longitude.Default />
-                              <node.children.latitude.Default />
+                              {node.children.longitude.Default()}
+                              {node.children.latitude.Default()}
                             </div>
                           </div>
                         )
-                      return <node.Default />
-                    }}
-                  />
-                )}
+                      return node.Default()
+                    },
+                  })}
 
                 <div style={{ marginTop: 12 }}>
                   <button type="submit">Submit</button>
