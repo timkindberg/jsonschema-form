@@ -308,10 +308,22 @@ export function createContinuation<R>(
     return options.renderChild ? options.renderChild(core, resolver) : resolve(core, resolver)
   }
 
+  // A child's reconciliation key must be its *relative* identity — stable across
+  // a re-path — not its absolute path. A re-pathed array item (`contacts.1` →
+  // `contacts.0`, ADR 018) carries the changed index in every descendant's path,
+  // so path keys would remount the surviving subtree and discard its uncontrolled
+  // value. Object containers identify a child by its property *name* (last path
+  // segment); positional containers (array/arrayItem) by *index*. Both are unique
+  // among siblings and survive a dense re-path. (Vanilla joins markup and ignores
+  // keys, so conformance is indifferent to this choice.)
+  function childKey(core: ContainerNode, child: AnyNode, index: number): string {
+    return core.isGroup ? lastSegment(child.path) : String(index)
+  }
+
   function renderChildren(core: ContainerNode, resolver: Resolver<R>): R {
     return adapter.combine({
-      children: core.children.map((c) => ({
-        key: c.path,
+      children: core.children.map((c, i) => ({
+        key: childKey(core, c, i),
         node: renderChild(c, resolver),
       })),
     })
