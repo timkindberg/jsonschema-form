@@ -9,7 +9,7 @@ export function ValidationSummary(): ReactNode {
   const issues = useValidationIssues()
   if (issues.length === 0) return null
   return (
-    <ul className="jsf-validation-summary" role="alert" aria-live="polite">
+    <ul className="jsf-validation-summary" role="alert">
       {issues.map((issue, i) => (
         <li key={i}>
           <a href={`#${fieldControlId(issue.path)}`}>

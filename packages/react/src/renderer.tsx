@@ -216,7 +216,7 @@ export function fieldControlId(path: string): string {
   return path
 }
 
-/** Stable error-list `id` for `aria-describedby` / summary anchor targets. */
+/** Stable error-list `id` for `aria-describedby` on the field control. */
 export function fieldErrorId(path: string): string {
   return `${path}-errors`
 }
@@ -231,7 +231,6 @@ function DefaultFieldErrors({ path }: { path: string }): ReactNode {
       id={fieldErrorId(path)}
       className="jsf-field-errors"
       role="alert"
-      aria-live="polite"
     >
       {issues.map((issue, i) => (
         <li key={i}>{issue.message}</li>
