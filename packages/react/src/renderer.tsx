@@ -269,25 +269,26 @@ interface ArraySlot {
 
 /**
  * The stateful heart of array add/remove (React-only). It owns the list of item
- * *slots* — each a monotonic id that is BOTH the React key and the item's path
- * index (so its core is minted once, at `contacts.{id}`, and never re-pathed).
+ * *slots* — each a monotonic `id` (the React key / identity) paired with a `core`
+ * minted at the item's **dense position**, so identity and path are decoupled.
  *
- * That stability is the whole game: the cached core is a stable `core` prop, so
- * `NodeRenderer`'s `memo` bails. Appending re-renders only `ArrayRoot` and mounts
- * the one new item; removing unmounts exactly the dropped item — every survivor
- * keeps its identity and its uncontrolled input value, with zero re-renders.
+ * Re-pathing happens **event-time, in the state updater** (never during render),
+ * keeping render pure (ADR 017): a slot whose position is unchanged keeps its
+ * exact `core` reference, so `NodeRenderer`'s `memo` bails and it does not
+ * re-render; a slot that shifts (after a remove) re-mints its `core` at the new
+ * index, so just those survivors re-render to update their dense `name` attrs in
+ * place — their React key is unchanged, so the DOM (and uncontrolled value)
+ * survives. Appending shifts nothing, so it re-renders no existing item.
  *
- * Ids are never reused, so paths can become non-contiguous (e.g. after removing
- * the first of two, the survivor stays `contacts.1`). Reindexing instead would
- * re-path the survivors, and the path-keyed child fold would remount them —
- * losing the very values we are protecting. Dense, 0-based submission is a
- * submit-time concern, tracked separately, not a reason to churn identity here.
+ * Ids are never reused and are the React key only (identity); the item's path is
+ * its dense position, re-minted on shift. This realizes ADR 016's lifted
+ * constraint and reverses ADR 015 §6's stable-sparse paths (ADR 018).
  */
 function ArrayRoot({ node }: { node: EArray }): ReactNode {
   const { label, description, addButton } = node.parts
   const seedCount = Object.keys(node.children).length
-  // Monotonic id source (also the path index). Seeded past the initial items and
-  // only advanced inside handlers (event-time, never during render).
+  // Monotonic id source — the React *key* only, never a path index. Seeded past
+  // the initial items and advanced only in handlers (event-time, not in render).
   const nextId = useRef(seedCount)
   const [slots, setSlots] = useState<ArraySlot[]>(() =>
     Array.from({ length: seedCount }, (_, i) => ({
@@ -295,16 +296,34 @@ function ArrayRoot({ node }: { node: EArray }): ReactNode {
       core: node.getItem(i),
     }))
   )
+  const itemPath = useCallback(
+    (index: number) => (node.path ? `${node.path}.${index}` : String(index)),
+    [node]
+  )
+  /** Re-mint cores for slots whose position changed; leave the rest by reference. */
+  const densify = useCallback(
+    (list: ArraySlot[]): ArraySlot[] =>
+      list.map((slot, index) =>
+        slot.core.path === itemPath(index)
+          ? slot
+          : { ...slot, core: node.getItem(index) }
+      ),
+    [node, itemPath]
+  )
   const add = useCallback(() => {
-    const id = nextId.current++
-    setSlots((s) => [...s, { id, core: node.getItem(id) }])
+    setSlots((s) => [
+      ...s,
+      { id: nextId.current++, core: node.getItem(s.length) },
+    ])
   }, [node])
-  // Drop by id: stable keys + stable paths mean React keeps every survivor's DOM
-  // (and value) untouched — only the removed item unmounts. Stable identity also
-  // lets `ArrayItemActions` bind a referentially-stable handler per item.
-  const removeById = useCallback((id: number) => {
-    setSlots((s) => s.filter((slot) => slot.id !== id))
-  }, [])
+  // Drop by id, then re-path survivors densely. Unshifted survivors keep their
+  // `core` (memo bail); shifted ones re-mint and re-render in place (value kept).
+  const removeById = useCallback(
+    (id: number) => {
+      setSlots((s) => densify(s.filter((slot) => slot.id !== id)))
+    },
+    [densify]
+  )
   const addActions = useMemo<ArrayActions>(() => ({ add }), [add])
 
   return (
@@ -365,6 +384,10 @@ function PartHost({ render }: { render: () => ReactNode }): ReactNode {
   return render()
 }
 
+// The engine supplies each child's *relative* identity as `key` (a property name
+// or positional index), stable across a dense array re-path — so the fragment key
+// is stable too, and a surviving item reconciles in place instead of remounting
+// (ADR 018). We render through it verbatim.
 const combine: ReactAdapter['combine'] = ({ children }) => (
   <>
     {children.map((c) => (

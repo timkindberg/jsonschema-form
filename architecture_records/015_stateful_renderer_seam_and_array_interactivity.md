@@ -47,6 +47,8 @@ The per-item Context value must be **referentially stable**, or it defeats the v
 
 Ids are never reused, so after removing the first of two, the survivor *stays* `contacts.1`. Reindexing survivors to be contiguous would re-path them, and the **path-keyed child fold would remount them** — losing the very values we protect. We chose identity preservation. Dense, 0-based **submission** is therefore a submit-time concern (today `unflatten` yields a sparse array), tracked as a follow-up — not a reason to churn React identity on every remove.
 
+> **Superseded by ADR 018.** This reasoning conflated two remount vectors. ADR 016 made the re-render itself safe, and ADR 018 then keyed the child fold by *position* (not path), decoupling React identity from the form path — so survivors now **do** re-path densely, in place, without remounting. Paths are dense (not stable-sparse); submission is contiguous; identity is the synthetic id alone.
+
 ### 7. The perf contract is a number, not a proxy — a counting adapter
 
 DOM-identity/value preservation is a strong *proxy* (a remount **is** a value loss), but it cannot see a re-render that happens to keep the same DOM. So the contract is also stated directly: a `RendererAdapter` that tallies each node/part renderer invocation by path (`render-counts.test.tsx`). It pins three numbers — an unrelated parent re-render runs **zero** node renderers (the decision-2 floor); an **add** re-renders nothing in the existing items, *including* their Remove buttons (exactly one `removeButton`, the new one); a **remove** re-renders nothing in the survivor. The adapter is just the public renderer surface instrumented, so it doubles as the worked example that the surface is fully swappable.

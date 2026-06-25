@@ -2,11 +2,14 @@ import { useState } from 'react'
 import { useSchemaForm } from '@jsonschema-form/react'
 import type { JSONSchema } from '@jsonschema-form/core'
 
-// Dynamic arrays on the continuation engine (ADR 015). Two array shapes here:
+// Dynamic arrays on the continuation engine (ADR 015 + 018). Two array shapes:
 //   • multiselect — primitive arrays with enum/oneOf render as <select multiple>
-//   • dynamic add/remove — object & primitive arrays grow/shrink via the engine,
-//     and (the whole point) every existing item keeps its typed value across an
-//     add or remove: stable React keys mean React updates in place, never remounts.
+//   • dynamic add/remove — object & primitive arrays grow/shrink via the engine.
+// Two guarantees, both visible below: every existing item keeps its typed value
+// across an add or remove (stable React keys → update in place, never remount),
+// AND paths stay dense (ADR 018) — remove the first of two and the survivor
+// re-paths from `…1` to `…0` in place, so submission is a contiguous array, never
+// a sparse one with a leading hole.
 
 const schema: JSONSchema = {
   type: 'object',
@@ -71,10 +74,12 @@ function App() {
       <h1>Dynamic arrays (ADR 015)</h1>
       <p style={{ color: '#555' }}>
         Add/remove items folded by the continuation engine. The trick: each item
-        has a <strong>stable React key</strong>, so adding or removing a sibling
+        has a <strong>stable React key</strong> (its identity) decoupled from its{' '}
+        <strong>path</strong> (its position), so adding or removing a sibling
         updates the list <em>in place</em> — every other item keeps its typed
-        value with no remount. Type into a few fields, then add and remove items
-        to see values survive.
+        value with no remount, while paths stay <em>dense</em>. Type into a few
+        fields, remove the first item, then submit: the survivors re-path to a
+        contiguous array — no holes.
       </p>
 
       <form onSubmit={form.submit(setSubmitted)}>

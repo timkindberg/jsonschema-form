@@ -117,10 +117,10 @@ describe('render-count contract', () => {
     expect(counts['arrayItem.removeButton'] ?? 0).toBe(1)
   })
 
-  // Guard for the same Context-stability property on the way down: dropping one
-  // item must not re-render the survivor (its slot — and thus its actions — is
-  // untouched, so React keeps the whole subtree, button included).
-  it('removing an item re-renders nothing in the survivor', async () => {
+  // ADR 018: removing the LAST item shifts no survivor's position, so dense
+  // re-pathing is a no-op and nothing of the survivor re-renders (its slot — and
+  // thus its actions/core — is untouched, so React keeps the whole subtree).
+  it('removing the last item re-renders nothing in the survivors', async () => {
     const counts: Counts = {}
     const Counting = createRenderer(countingAdapter(counts))
     const form = jsonSchemaToTree(arraySchema)
@@ -132,16 +132,48 @@ describe('render-count contract', () => {
       .toBe(2)
 
     reset(counts)
-    await screen.getByRole('button', { name: /remove/i }).first().click()
+    // drop the SECOND (last) item — the survivor at contacts.0 does not shift
+    await screen.getByRole('button', { name: /remove/i }).nth(1).click()
     await expect
       .poll(() => document.querySelectorAll('input[name$=".name"]').length)
       .toBe(1)
 
-    // The survivor (contacts.1) keeps its identity — nothing of it re-renders.
-    expect(counts['field.root:contacts.1.name'] ?? 0).toBe(0)
-    expect(counts['field.input:contacts.1.name'] ?? 0).toBe(0)
-    expect(counts['arrayItem.root:contacts.1'] ?? 0).toBe(0)
+    expect(counts['field.root:contacts.0.name'] ?? 0).toBe(0)
+    expect(counts['field.input:contacts.0.name'] ?? 0).toBe(0)
+    expect(counts['arrayItem.root:contacts.0'] ?? 0).toBe(0)
     expect(counts['arrayItem.removeButton'] ?? 0).toBe(0)
+  })
+
+  // ADR 018: removing a NON-last item re-paths the items after it densely, so
+  // exactly those survivors re-render (to update their `name`s) while the ones
+  // before the gap stay untouched. Values survive in place (see arrays.test).
+  it('removing a middle item re-renders only the items after it', async () => {
+    const counts: Counts = {}
+    const Counting = createRenderer(countingAdapter(counts))
+    const form = jsonSchemaToTree(arraySchema)
+    const screen = await render(<Counting form={form} />)
+
+    // grow to three items: contacts.0, .1, .2
+    await screen.getByRole('button', { name: /add/i }).click()
+    await screen.getByRole('button', { name: /add/i }).click()
+    await expect
+      .poll(() => document.querySelectorAll('input[name$=".name"]').length)
+      .toBe(3)
+
+    reset(counts)
+    // drop the MIDDLE item (contacts.1); the tail (contacts.2) re-paths to .1
+    await screen.getByRole('button', { name: /remove/i }).nth(1).click()
+    await expect
+      .poll(() => document.querySelectorAll('input[name$=".name"]').length)
+      .toBe(2)
+
+    // the item BEFORE the gap is untouched (same position → memo bail)…
+    expect(counts['field.root:contacts.0.name'] ?? 0).toBe(0)
+    expect(counts['field.input:contacts.0.name'] ?? 0).toBe(0)
+    expect(counts['arrayItem.root:contacts.0'] ?? 0).toBe(0)
+    // …the tail re-rendered at its new dense path contacts.1 (in place, no remount)
+    expect(counts['arrayItem.root:contacts.1'] ?? 0).toBeGreaterThan(0)
+    expect(counts['field.input:contacts.1.name'] ?? 0).toBeGreaterThan(0)
   })
 
   // Guard for the NodeRenderer memo floor (ADR 015 / render-stability.test.tsx),
