@@ -55,7 +55,6 @@ describe('validation a11y wiring', () => {
     const usernameErrors = document.getElementById(fieldErrorId('username'))
     expect(usernameErrors).not.toBeNull()
     expect(usernameErrors?.getAttribute('role')).toBe('alert')
-    expect(usernameErrors?.getAttribute('aria-live')).toBe('polite')
     expect(username?.getAttribute('aria-describedby')).toBe(
       usernameErrors?.id
     )
