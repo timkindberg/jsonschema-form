@@ -15,6 +15,8 @@ type JoinPath<Prefix extends string, Key extends string> = Prefix extends ''
   ? Key
   : `${Prefix}.${Key}`
 
+type IndexedArrayPrefix<Prefix extends string> = `${Prefix}.${number}`
+
 type RequiredKeys<S> = S extends { readonly required: readonly (infer K)[] }
   ? K extends string
     ? K
@@ -41,17 +43,22 @@ type InferSchemaData<S> = S extends { readonly const: infer C }
       ? InferObjectData<P, RequiredKeys<S>>
       : S extends { readonly properties: infer P extends Record<string, unknown> }
         ? InferObjectData<P, RequiredKeys<S>>
-        : S extends { readonly type: 'array'; readonly items: infer I }
-          ? readonly InferSchemaData<I>[]
-          : S extends { readonly type: 'string' }
-            ? string
-            : S extends { readonly type: 'number' | 'integer' }
-              ? number
-              : S extends { readonly type: 'boolean' }
-                ? boolean
-                : S extends { readonly type: 'null' }
-                  ? null
-                  : unknown
+        : S extends {
+              readonly type: 'array'
+              readonly items: readonly unknown[]
+            }
+          ? unknown
+          : S extends { readonly type: 'array'; readonly items: infer I }
+            ? readonly InferSchemaData<I>[]
+            : S extends { readonly type: 'string' }
+              ? string
+              : S extends { readonly type: 'number' | 'integer' }
+                ? number
+                : S extends { readonly type: 'boolean' }
+                  ? boolean
+                  : S extends { readonly type: 'null' }
+                    ? null
+                    : unknown
 
 type FieldPathFromProperties<
   P extends Record<string, unknown>,
@@ -62,6 +69,14 @@ type FieldPathFromProperties<
     | JoinPath<Prefix, K>
     | FieldPathFromSchema<P[K], JoinPath<Prefix, K>, NextDepth<Depth>>
 }[keyof P & string]
+
+type FieldPathFromArrayItems<
+  I,
+  Prefix extends string,
+  Depth extends number,
+> =
+  | IndexedArrayPrefix<Prefix>
+  | FieldPathFromSchema<I, IndexedArrayPrefix<Prefix>, NextDepth<Depth>>
 
 type FieldPathFromSchema<
   S,
@@ -79,21 +94,28 @@ type FieldPathFromSchema<
       : S extends { readonly type: 'array'; readonly items: infer I }
         ? Prefix extends ''
           ? never
-          : Prefix | FieldPathFromSchema<I, Prefix, NextDepth<Depth>>
+          : FieldPathFromArrayItems<I, Prefix, Depth>
         : never
 
 /**
  * Maps a `const`-typed JSON Schema literal to its corresponding data type.
  *
- * Supports: object (with `properties` / `required`), array (`items`), primitives,
- * `enum`, and `const`. Everything else resolves to `unknown`.
+ * Supports: object (with `properties` / `required`), array (single-schema `items`),
+ * `string` / `number` / `integer` / `boolean` / `null`, `enum`, and `const`.
+ * Tuple `items`, `$ref`, and combiners (`allOf` / `anyOf` / `oneOf`) resolve to
+ * `unknown`.
  */
 export type InferData<S> = InferSchemaData<S>
 
 /**
- * String-literal union of dot-paths into schema data (e.g. `"address.street"`).
+ * Schema-relative dot-path union aligned with runtime `node.path` / validation
+ * `issue.path` (ADR 018). Object keys use dot notation; each array segment is a
+ * `${number}` placeholder matching concrete indexed paths at runtime (e.g.
+ * `contacts.0.email`, not `contacts.email`).
  *
- * Recursion is bounded by {@link FieldPathDepthLimit}. Paths through array items
- * use the array property prefix plus item field names (e.g. `"users.name"`).
+ * - Array of objects: `` `users.${number}.name` ``, plus `` `users.${number}` ``
+ * - Array of primitives: `` `tags.${number}` ``
+ *
+ * Recursion is bounded by {@link FieldPathDepthLimit}.
  */
 export type FieldPath<S> = FieldPathFromSchema<S>
