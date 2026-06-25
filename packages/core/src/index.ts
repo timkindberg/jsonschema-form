@@ -34,6 +34,8 @@ export type {
   ValidationIssue,
   ValidationResult,
   Validator,
+  InferData,
+  FieldPath,
 } from './types'
 
 // Export main parser
