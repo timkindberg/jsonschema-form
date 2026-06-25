@@ -35,6 +35,7 @@
   },
   "devDependencies": {
     "@jsonschema-form/vanilla": "*",
+    "@jsonschema-form/validation-ajv": "*",
     "@types/react": "^18.2.0",
     "@vitejs/plugin-react": "^4.3.4",
     "@vitest/browser": "^4.0.14",

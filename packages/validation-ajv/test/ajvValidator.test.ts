@@ -39,6 +39,18 @@ describe('createAjvValidator — AJV specifics', () => {
     expect(result.issues.map((i) => i.path)).toContain('a/b')
   })
 
+  it('coerces stringly-typed FormData values (number from a string) by default', () => {
+    const validate = createAjvValidator({
+      type: 'object',
+      properties: { age: { type: 'number', minimum: 0 } },
+    })
+    // "25" is what a native number input yields in FormData — must pass, not
+    // fail a `type: number` check.
+    expect(validate({ age: '25' }).valid).toBe(true)
+    // and the constraint still bites once coerced
+    expect(validate({ age: '-1' }).valid).toBe(false)
+  })
+
   it('carries AJV-authored messages through unchanged', () => {
     const validate = createAjvValidator({
       type: 'object',

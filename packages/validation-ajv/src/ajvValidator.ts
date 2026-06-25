@@ -19,15 +19,23 @@ export interface AjvValidatorOptions {
  * the returned function validates data and returns issues keyed by the same
  * dot-path as `node.path`, so a renderer can map each issue straight to its field.
  *
- * Defaults to `allErrors` (collect every problem, not just the first) and
- * `strict: false` (form schemas lean on annotations like `title`/`description`
- * and `oneOf`, which strict mode is fussy about).
+ * Defaults suit form data: `allErrors` (collect every problem, not just the
+ * first), `strict: false` (form schemas lean on annotations like
+ * `title`/`description` and `oneOf`, which strict mode is fussy about), and
+ * `coerceTypes: true` — native FormData is all strings, so a `number`/`integer`/
+ * `boolean` field would otherwise spuriously fail its type check. Coercion
+ * normalizes the validated object in place; override via `options.ajv`.
  */
 export function createAjvValidator(
   schema: JSONSchema,
   options: AjvValidatorOptions = {}
 ): Validator {
-  const ajv = new Ajv({ allErrors: true, strict: false, ...options.ajv })
+  const ajv = new Ajv({
+    allErrors: true,
+    strict: false,
+    coerceTypes: true,
+    ...options.ajv,
+  })
   const validate = ajv.compile(schema as object)
 
   return (data: unknown) => {
