@@ -1988,4 +1988,205 @@ describe('jsonSchemaToTree', () => {
       expect(() => jsonSchemaToTree(schema)).toThrow(/\$ref target not found/)
     })
   })
+
+  describe('allOf object-composition merge', () => {
+    it('merges properties and required from two allOf subschemas', () => {
+      const inlined: JSONSchema = {
+        type: 'object',
+        properties: {
+          name: { type: 'string', title: 'Name' },
+          email: { type: 'string', format: 'email' },
+        },
+        required: ['name', 'email'],
+      }
+
+      const withAllOf: JSONSchema = {
+        type: 'object',
+        allOf: [
+          {
+            properties: {
+              name: { type: 'string', title: 'Name' },
+            },
+            required: ['name'],
+          },
+          {
+            properties: {
+              email: { type: 'string', format: 'email' },
+            },
+            required: ['email'],
+          },
+        ],
+      }
+
+      const inlinedTree = jsonSchemaToTree(inlined)
+      const allOfTree = jsonSchemaToTree(withAllOf)
+
+      expect(allOfTree.toJSON()).toEqual(inlinedTree.toJSON())
+    })
+
+    it('merges allOf with sibling properties on the parent schema', () => {
+      const inlined: JSONSchema = {
+        type: 'object',
+        properties: {
+          id: { type: 'string', title: 'ID' },
+          status: { type: 'string', enum: ['draft', 'published'] },
+        },
+        required: ['id', 'status'],
+      }
+
+      const withAllOf: JSONSchema = {
+        type: 'object',
+        properties: {
+          id: { type: 'string', title: 'ID' },
+        },
+        required: ['id'],
+        allOf: [
+          {
+            properties: {
+              status: { type: 'string', enum: ['draft', 'published'] },
+            },
+            required: ['status'],
+          },
+        ],
+      }
+
+      const inlinedTree = jsonSchemaToTree(inlined)
+      const allOfTree = jsonSchemaToTree(withAllOf)
+
+      expect(allOfTree.toJSON()).toEqual(inlinedTree.toJSON())
+    })
+
+    it('recursively merges nested allOf inside properties', () => {
+      const inlined: JSONSchema = {
+        type: 'object',
+        properties: {
+          profile: {
+            type: 'object',
+            title: 'Profile',
+            properties: {
+              firstName: { type: 'string', minLength: 1 },
+              lastName: { type: 'string', minLength: 1 },
+            },
+            required: ['firstName', 'lastName'],
+          },
+        },
+      }
+
+      const withAllOf: JSONSchema = {
+        type: 'object',
+        properties: {
+          profile: {
+            type: 'object',
+            title: 'Profile',
+            allOf: [
+              {
+                properties: {
+                  firstName: { type: 'string', minLength: 1 },
+                },
+                required: ['firstName'],
+              },
+              {
+                properties: {
+                  lastName: { type: 'string', minLength: 1 },
+                },
+                required: ['lastName'],
+              },
+            ],
+          },
+        },
+      }
+
+      const inlinedTree = jsonSchemaToTree(inlined)
+      const allOfTree = jsonSchemaToTree(withAllOf)
+
+      expect(allOfTree.toJSON()).toEqual(inlinedTree.toJSON())
+    })
+
+    it('merges allOf entries that are $refs after ref resolution', () => {
+      const inlined: JSONSchema = {
+        type: 'object',
+        properties: {
+          name: { type: 'string', title: 'Name', minLength: 2 },
+          email: { type: 'string', format: 'email', title: 'Email' },
+        },
+        required: ['name'],
+      }
+
+      const withRefsAndAllOf = {
+        type: 'object',
+        allOf: [{ $ref: '#/$defs/Base' }, { $ref: '#/$defs/Contact' }],
+        required: ['name'],
+        $defs: {
+          Base: {
+            type: 'object',
+            properties: {
+              name: { type: 'string', title: 'Name', minLength: 2 },
+            },
+          },
+          Contact: {
+            type: 'object',
+            properties: {
+              email: { type: 'string', format: 'email', title: 'Email' },
+            },
+          },
+        },
+      }
+
+      const inlinedTree = jsonSchemaToTree(inlined)
+      const mergedTree = jsonSchemaToTree(withRefsAndAllOf)
+
+      expect(mergedTree.toJSON()).toEqual(inlinedTree.toJSON())
+    })
+
+    it('throws on conflicting type when merging colliding properties', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        allOf: [
+          {
+            properties: {
+              value: { type: 'string' },
+            },
+          },
+          {
+            properties: {
+              value: { type: 'number' },
+            },
+          },
+        ],
+      }
+
+      expect(() => jsonSchemaToTree(schema)).toThrow(/Conflicting type in allOf merge/)
+    })
+
+    it('uses the most restrictive bounds when merging colliding property constraints', () => {
+      const schema: JSONSchema = {
+        type: 'object',
+        allOf: [
+          {
+            properties: {
+              username: { type: 'string', minLength: 2, maxLength: 30 },
+            },
+          },
+          {
+            properties: {
+              username: {
+                type: 'string',
+                minLength: 5,
+                maxLength: 20,
+                title: 'Username',
+              },
+            },
+          },
+        ],
+      }
+
+      const form = jsonSchemaToTree(schema)
+      const field = form.getField('username') as InputFieldNode | undefined
+
+      expect(field?.parts.label.text).toBe('Username')
+      expect(field?.parts.input.attrs.minLength).toBe(5)
+      expect(field?.parts.input.attrs.maxLength).toBe(20)
+    })
+  })
+
 })
