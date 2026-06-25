@@ -44,6 +44,7 @@ import {
 import {
   createContinuation,
   mergeAdapter,
+  groupIssuesByPath,
   type Continuation,
   type RendererAdapter,
   type PartialAdapter,
@@ -60,6 +61,7 @@ import {
   type HtmlInputAttrs,
   type HtmlSelectAttrs,
   type SelectOption,
+  type ValidationIssue,
 } from '@jsonschema-form/core'
 
 // ---------------------------------------------------------------------------
@@ -137,6 +139,60 @@ function DefaultGroupLabel({ text }: { text: string }): ReactNode {
   return <legend>{text}</legend>
 }
 
+// ---------------------------------------------------------------------------
+// Validation display (ADR 019) — runtime state, NOT an IR part.
+//
+// Validation issues are produced at submit by a side-loaded `Validator` and are
+// pure runtime state, so they live in React Context keyed by `node.path` — never
+// in the schema-derived `parts`. The default empty map means a field with no
+// issues (and any tree rendered with no `ValidationProvider`, e.g. the
+// conformance oracle) emits NO error markup, so React still matches vanilla.
+// ---------------------------------------------------------------------------
+
+const EMPTY_ISSUES: ValidationIssue[] = []
+const ValidationContext = createContext<Map<string, ValidationIssue[]>>(
+  new Map()
+)
+
+/**
+ * Provide submit-time issues to the fields below (ADR 019). A stable module-level
+ * type: updating `issues` re-renders only the per-field error consumers (and
+ * recomputes the path map), leaving the uncontrolled inputs mounted in place.
+ */
+export function ValidationProvider({
+  issues,
+  children,
+}: {
+  issues: ValidationIssue[]
+  children: ReactNode
+}): ReactNode {
+  const byPath = useMemo(() => groupIssuesByPath(issues), [issues])
+  return (
+    <ValidationContext.Provider value={byPath}>
+      {children}
+    </ValidationContext.Provider>
+  )
+}
+
+/** The issues for one field path (empty array when none) — for custom renderers. */
+export function useFieldIssues(path: string): ValidationIssue[] {
+  return useContext(ValidationContext).get(path) ?? EMPTY_ISSUES
+}
+
+/** A field's own issues, or nothing. Isolated consumer: re-renders on validation
+ * without disturbing its sibling input (so typed values survive a failed submit). */
+function DefaultFieldErrors({ path }: { path: string }): ReactNode {
+  const issues = useFieldIssues(path)
+  if (issues.length === 0) return null
+  return (
+    <ul className="jsf-field-errors" role="alert">
+      {issues.map((issue, i) => (
+        <li key={i}>{issue.message}</li>
+      ))}
+    </ul>
+  )
+}
+
 /** Compose a field from its parts: label, description, and the widget control. */
 function DefaultFieldRoot({
   node,
@@ -164,6 +220,7 @@ function DefaultFieldRoot({
       {renderSlot(node.parts.label, 'label')}
       {renderSlot(node.parts.description, 'description')}
       {control}
+      <DefaultFieldErrors path={node.path} />
     </div>
   )
 }

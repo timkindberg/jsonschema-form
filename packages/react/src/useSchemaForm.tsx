@@ -1,6 +1,10 @@
-import { useMemo, type FC, type ReactNode } from 'react'
+import { useMemo, useState, useCallback, type FC, type ReactNode } from 'react'
 import { jsonSchemaToTree } from '@jsonschema-form/core'
-import type { JSONSchema } from '@jsonschema-form/core'
+import type {
+  JSONSchema,
+  Validator,
+  ValidationIssue,
+} from '@jsonschema-form/core'
 import {
   SchemaFields as SchemaFieldsRenderer,
   type EGroup,
@@ -18,31 +22,83 @@ export interface BoundSchemaFieldsProps {
   children?: (root: EGroup) => ReactNode
 }
 
+/** Options for {@link useSchemaForm}. */
+export interface UseSchemaFormOptions {
+  /**
+   * A side-loaded, submit-time validator (ADR 019) — e.g. `createAjvValidator`
+   * from `@jsonschema-form/validation-ajv`. When set, `submit` runs it, exposes
+   * `errors`, and only calls your handler when the data is valid. Omit for no
+   * validation (behaviour is unchanged).
+   */
+  validator?: Validator
+}
+
 /**
  * Convenience hook: compiles a JSON Schema into the Core form tree and hands
  * back a `SchemaFields` component already bound to it. Pure sugar over the
  * renderer (ADR 010/013) — `useSchemaForm` holds the tree and forwards
  * `renderNode`/place-yourself children to the same continuation.
  *
+ * Pass a `validator` (ADR 019) to get submit-time validation: `submit` runs it,
+ * blocks your handler on failure, and exposes `errors`. To render each issue
+ * under its field, wrap the fields in `<ValidationProvider issues={errors}>`
+ * (kept explicit so you own where issues live — ADR 013).
+ *
  * `SchemaFields` renders the form's *content only* — wrap it in your own
  * `<form>` and submit (chrome is the consumer's, ADR 013):
  *
  * @example
  * ```tsx
- * const { form, SchemaFields } = useSchemaForm(schema)
+ * const { SchemaFields, submit, errors } = useSchemaForm(schema, {
+ *   validator: createAjvValidator(schema),
+ * })
  * return (
- *   <form onSubmit={form.submit(onSubmit)}>
- *     <SchemaFields />
+ *   <form noValidate onSubmit={submit(onValid)}>
+ *     <ValidationProvider issues={errors}>
+ *       <SchemaFields />
+ *     </ValidationProvider>
  *     <button type="submit">Submit</button>
  *   </form>
  * )
  * ```
  */
-export function useSchemaForm(schema: JSONSchema) {
+export function useSchemaForm(
+  schema: JSONSchema,
+  options: UseSchemaFormOptions = {}
+) {
+  const { validator } = options
   const form = useMemo(() => jsonSchemaToTree(schema), [schema])
 
+  // Submit-time issues. Surfacing them re-renders only the per-field error
+  // consumers (via `ValidationProvider`'s Context), never the uncontrolled
+  // inputs (the memoized node renderer bails), so typed values survive.
+  const [errors, setErrors] = useState<ValidationIssue[]>([])
+
+  /**
+   * Build the form's submit handler. Reuses Core's `submit` to assemble the data
+   * from native FormData, then gates on the validator: record issues, and call
+   * `onValid` only when the data passes. Without a validator it is a thin
+   * pass-through. Returns a DOM submit handler — `<form onSubmit={submit(fn)}>`.
+   */
+  const submit = useCallback(
+    (onValid?: (data: Record<string, unknown>) => void) =>
+      form.submit((data) => {
+        const result = validator
+          ? validator(data)
+          : { valid: true, issues: [] as ValidationIssue[] }
+        setErrors(result.issues)
+        if (result.valid) onValid?.(data)
+      }),
+    [form, validator]
+  )
+
+  // Memoized on `form` for a stable component type — the consumer's
+  // `<SchemaFields/>` never remounts across validation passes.
   const SchemaFields = useMemo<FC<BoundSchemaFieldsProps>>(() => {
-    return function SchemaFields({ renderNode, children }: BoundSchemaFieldsProps) {
+    return function SchemaFields({
+      renderNode,
+      children,
+    }: BoundSchemaFieldsProps) {
       return (
         <SchemaFieldsRenderer form={form} renderNode={renderNode}>
           {children}
@@ -51,5 +107,5 @@ export function useSchemaForm(schema: JSONSchema) {
     }
   }, [form])
 
-  return { form, SchemaFields }
+  return { form, SchemaFields, submit, errors }
 }
