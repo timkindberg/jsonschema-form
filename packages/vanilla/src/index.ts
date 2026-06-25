@@ -28,3 +28,24 @@ export type {
   VArray,
   VArrayItem,
 } from './renderToString'
+
+export {
+  renderToDom,
+  createDomRenderer,
+  defaultDomAdapter,
+  diagnosticDomAdapter,
+  serializeDomToOracleHtml,
+} from './domRenderer'
+export type {
+  DomRenderNode,
+  RenderToDomOptions,
+  DomAdapter,
+  DomPartialAdapter,
+  DomVNode,
+  DomField,
+  DomInputField,
+  DomSelectField,
+  DomGroup,
+  DomArray,
+  DomArrayItem,
+} from './domRenderer'
