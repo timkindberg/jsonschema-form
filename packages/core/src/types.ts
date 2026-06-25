@@ -30,3 +30,5 @@ export type {
 } from './parser/nodeTypes'
 
 export type { ValidationIssue, ValidationResult, Validator } from './validation'
+
+export type { InferData, FieldPath } from './infer'
