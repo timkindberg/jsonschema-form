@@ -1,8 +1,9 @@
 // Reactive (validate-on-change) validation (ADR 021).
 //
-// Consumer wires `revalidate` to their `<form onChange>`; the hook reads native
-// FormData, runs the side-loaded Validator, and updates the same `errors` state
-// that ValidationProvider already consumes — inputs stay uncontrolled.
+// Consumer wires `revalidate` to their form's `onInput` (per keystroke) or
+// `onChange` (blur for text fields); the hook reads native FormData, runs the
+// side-loaded Validator, and updates the same `errors` state — inputs stay
+// uncontrolled.
 
 import { useMemo } from 'react'
 import { describe, it, expect } from 'vitest'
@@ -21,7 +22,21 @@ const schema: JSONSchema = {
   },
 }
 
-function LiveHarness() {
+function InputHarness() {
+  const validator = useMemo(() => createAjvValidator(schema), [])
+  const { SchemaFields, revalidate, errors } = useSchemaForm(schema, {
+    validator,
+  })
+  return (
+    <form noValidate onInput={revalidate}>
+      <ValidationProvider issues={errors}>
+        <SchemaFields />
+      </ValidationProvider>
+    </form>
+  )
+}
+
+function ChangeHarness() {
   const validator = useMemo(() => createAjvValidator(schema), [])
   const { SchemaFields, revalidate, errors } = useSchemaForm(schema, {
     validator,
@@ -48,11 +63,17 @@ function SubmitOnlyHarness() {
   )
 }
 
+/** Simulate a keystroke: update value and bubble a native `input` event. */
+function dispatchInput(input: HTMLInputElement, value: string) {
+  input.value = value
+  input.dispatchEvent(new InputEvent('input', { bubbles: true }))
+}
+
 const errorEls = () => document.querySelectorAll('.jsf-field-errors')
 
 describe('reactive validation (ADR 021)', () => {
-  it('shows a field error while typing an invalid value, without submitting', async () => {
-    const screen = await render(<LiveHarness />)
+  it('shows a field error on native change (blur), without submitting', async () => {
+    const screen = await render(<ChangeHarness />)
 
     expect(errorEls().length).toBe(0)
 
@@ -62,16 +83,45 @@ describe('reactive validation (ADR 021)', () => {
     await expect.poll(() => errorEls().length).toBeGreaterThan(0)
   })
 
-  it('clears a field error when the value is corrected live', async () => {
-    const screen = await render(<LiveHarness />)
+  it('shows a field error on native input (per keystroke), without submitting', async () => {
+    await render(<InputHarness />)
 
-    const username = screen.getByRole('textbox', { name: 'Username' })
-    await username.fill('ab')
+    expect(errorEls().length).toBe(0)
+
+    const input = document.getElementById(
+      fieldControlId('username')
+    ) as HTMLInputElement
+    input.focus()
+    dispatchInput(input, 'a')
+    await expect
+      .poll(() => document.getElementById(fieldErrorId('username')))
+      .not.toBeNull()
+  })
+
+  it('does not revalidate on input alone when only onChange is wired', async () => {
+    await render(<ChangeHarness />)
+
+    const input = document.getElementById(
+      fieldControlId('username')
+    ) as HTMLInputElement
+    input.focus()
+    dispatchInput(input, 'ab')
+
+    expect(document.getElementById(fieldErrorId('username'))).toBeNull()
+  })
+
+  it('clears a field error when the value is corrected live', async () => {
+    await render(<InputHarness />)
+
+    const input = document.getElementById(
+      fieldControlId('username')
+    ) as HTMLInputElement
+    dispatchInput(input, 'ab')
     await expect
       .poll(() => document.getElementById(fieldErrorId('username')))
       .not.toBeNull()
 
-    await username.fill('alice')
+    dispatchInput(input, 'alice')
     await expect
       .poll(() => document.getElementById(fieldErrorId('username')))
       .toBeNull()
@@ -90,16 +140,18 @@ describe('reactive validation (ADR 021)', () => {
   })
 
   it('preserves uncontrolled input value and DOM identity across live revalidation', async () => {
-    const screen = await render(<LiveHarness />)
+    await render(<InputHarness />)
 
-    const username = screen.getByRole('textbox', { name: 'Username' })
-    const before = document.getElementById(fieldControlId('username'))
-    await username.fill('ab')
+    const input = document.getElementById(
+      fieldControlId('username')
+    ) as HTMLInputElement
+    const before = input
+    dispatchInput(input, 'ab')
 
     await expect
       .poll(() => document.getElementById(fieldErrorId('username')))
       .not.toBeNull()
-    await expect.element(username).toHaveValue('ab')
+    expect(input.value).toBe('ab')
     expect(document.getElementById(fieldControlId('username'))).toBe(before)
   })
 
@@ -117,7 +169,7 @@ describe('reactive validation (ADR 021)', () => {
         validator,
       })
       return (
-        <form noValidate onChange={revalidate}>
+        <form noValidate onInput={revalidate}>
           <ValidationProvider issues={errors}>
             <SchemaFields />
           </ValidationProvider>
