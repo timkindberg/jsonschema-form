@@ -47,9 +47,10 @@ export interface UseSchemaFormOptions {
  * `renderNode`/place-yourself children to the same continuation.
  *
  * Pass a `validator` (ADR 019) to get submit-time validation: `submit` runs it,
- * blocks your handler on failure, and exposes `errors`. Wire `onChange={revalidate}`
- * for live validation (ADR 021) — same validator, same errors state, inputs stay
- * uncontrolled. To render each issue under its field, wrap the fields in
+ * blocks your handler on failure, and exposes `errors`. Wire `revalidate` for live
+ * validation (ADR 021) — `onInput` validates per keystroke; native `onChange`
+ * validates on blur for text fields. Same validator, same `errors` state, inputs
+ * stay uncontrolled. To render each issue under its field, wrap the fields in
  * `<ValidationProvider issues={errors}>` (kept explicit so you own where issues
  * live — ADR 013).
  *
@@ -62,7 +63,7 @@ export interface UseSchemaFormOptions {
  *   validator: createAjvValidator(schema),
  * })
  * return (
- *   <form noValidate onSubmit={submit(onValid)} onChange={revalidate}>
+ *   <form noValidate onSubmit={submit(onValid)} onInput={revalidate}>
  *     <ValidationProvider issues={errors}>
  *       <SchemaFields />
  *     </ValidationProvider>
@@ -78,10 +79,9 @@ export function useSchemaForm(
   const { validator } = options
   const form = useMemo(() => jsonSchemaToTree(schema), [schema])
 
-  // Validation issues (submit-time and/or live). Surfacing them re-renders only
-  // the per-field error consumers (via `ValidationProvider`'s Context), never
-  // the uncontrolled inputs (the memoized node renderer bails), so typed values
-  // survive.
+  // Validation issues (submit-time and/or live). Updating `errors` re-renders
+  // every `useFieldIssues` consumer (O(fields) React work per pass) but the
+  // memoized field renderer bails, so uncontrolled inputs keep typed values.
   const [errors, setErrors] = useState<ValidationIssue[]>([])
 
   const runValidator = useCallback(
@@ -111,10 +111,12 @@ export function useSchemaForm(
   )
 
   /**
-   * Validate on change — wire to the consumer's `<form onChange={revalidate}>`.
-   * Reads native FormData from the form (via Core's submit assembler), runs the
-   * side-loaded validator, and updates `errors`. Opt-in: omit it and behaviour
-   * stays submit-only (ADR 021).
+   * Live validation — wire to the consumer's form event handler. Reads native
+   * FormData from `event.currentTarget` (via Core's submit assembler), runs the
+   * side-loaded validator, and updates `errors`. Use `onInput={revalidate}` for
+   * per-keystroke feedback; `onChange={revalidate}` validates on blur for text
+   * fields (native `change` semantics). Opt-in: omit both and behaviour stays
+   * submit-only (ADR 021).
    */
   const revalidate = useCallback(
     (e: FormEvent<HTMLFormElement>) => {

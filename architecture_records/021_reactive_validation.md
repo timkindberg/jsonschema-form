@@ -19,14 +19,21 @@ on every change while keeping inputs **uncontrolled** and the consumer owning th
 ## Decision
 
 **Expose an opt-in `revalidate` handler from `useSchemaForm` that the consumer
-wires to their `<form onChange>`.** On each change event:
+wires to their form's event handler.** On each event:
 
 1. Read `new FormData(event.currentTarget)` via Core's existing submit assembler
    (same nested-object shape as submit).
-2. Run the side-loaded `Validator`.
+2. Run the side-loaded `Validator` (full pass).
 3. Update the same `errors` state that `ValidationProvider` already consumes.
 
-Submit-time validation is unchanged. Without `onChange={revalidate}`, behaviour
+**Event choice is the consumer's:**
+
+- `onInput={revalidate}` — per-keystroke feedback (native `input` bubbles from
+  fields to the form).
+- `onChange={revalidate}` — validates on blur for text fields (native `change`
+  fires when the control loses focus, not on every keypress).
+
+Submit-time validation is unchanged. Without live handlers wired, behaviour
 stays submit-only (ADR 019).
 
 ```tsx
@@ -34,7 +41,12 @@ const { SchemaFields, submit, revalidate, errors } = useSchemaForm(schema, {
   validator: createAjvValidator(schema),
 })
 return (
-  <form noValidate onSubmit={submit(onValid)} onChange={revalidate}>
+  <form
+    noValidate
+    onSubmit={submit(onValid)}
+    onInput={revalidate}
+    onChange={revalidate}
+  >
     <ValidationProvider issues={errors}>
       <SchemaFields />
     </ValidationProvider>
@@ -46,13 +58,12 @@ return (
 ### Finding: native form-state suffices for live validation
 
 Live validation does **not** require a reactive form-state adapter. Reading
-FormData on `change` and updating a separate errors array re-renders only the
-error consumers (`DefaultFieldErrors`, `ValidationSummary`, aria attrs) — the
-memoized field renderer bails, so uncontrolled inputs keep their typed values,
-focus, and DOM identity across revalidation cycles. This answers ADR 011's
-reactivity question for validation: a form-state adapter is still justified for
-**richer reactivity** (conditional fields, derived values, cross-field UI), not
-for live validation alone.
+FormData on `input`/`change` and updating a separate `errors` array is enough
+while inputs stay uncontrolled: the memoized field renderer bails, so typed
+values, focus, and DOM identity survive revalidation cycles. This answers ADR
+011's reactivity question for validation: a form-state adapter is still
+justified for **richer reactivity** (conditional fields, derived values,
+cross-field UI), not for live validation alone.
 
 ### Native-attr constrain vs validator report
 
@@ -72,7 +83,7 @@ of truth for **reported** issues; native attrs are the source of truth for
 - **Async validation** — `Validator` stays synchronous (ADR 019); async is a
   future seam evolution when a second adapter forces it.
 - **Field/group-scoped triggers** — revalidate runs the full validator on every
-  form change; per-field scoping is a future optimization.
+  wired event; per-field scoping is a future optimization.
 - **Debounce** — consumer can wrap `revalidate` if needed; no built-in debounce
   yet.
 
@@ -87,6 +98,12 @@ of truth for **reported** issues; native attrs are the source of truth for
 - **ADR 011 updated in practice** — native form-state + side-loaded validation covers
   both submit-time and live validation; reactive form-state adapters remain optional
   for other reactivity needs.
+- **Performance cost per event** — each `revalidate` call runs the validator over
+  the full assembled data **and** updates `ValidationProvider`'s context, so
+  **every** `useFieldIssues` consumer re-renders (O(fields) React work), not
+  just the fields with issues. Input widgets themselves do not remount (memo
+  bail), but the validation pass is not free. **Debounce** and **field/group-scoped
+  triggers** are the intended mitigations and remain deferred (future beads).
 
 ## Alternatives Considered
 
