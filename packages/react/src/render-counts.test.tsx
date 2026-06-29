@@ -11,8 +11,15 @@ import { describe, it, expect } from 'vitest'
 import { render } from 'vitest-browser-react'
 import { jsonSchemaToTree } from '@jsonschema-form/core'
 import type { JSONSchema } from '@jsonschema-form/core'
-import { useState } from 'react'
-import { createRenderer, defaultAdapter, type ReactPartialAdapter } from './renderer'
+import { useState, useMemo } from 'react'
+import { createAjvValidator } from '@jsonschema-form/validation-ajv'
+import {
+  createRenderer,
+  defaultAdapter,
+  ValidationProvider,
+  type ReactPartialAdapter,
+} from './renderer'
+import { useSchemaForm } from './useSchemaForm'
 
 type Counts = Record<string, number>
 
@@ -203,5 +210,61 @@ describe('render-count contract', () => {
     await new Promise((r) => setTimeout(r, 20))
 
     expect(total(counts)).toBe(0)
+  })
+})
+
+// The validation fan-out contract (ADR 023): producing a new issue set must
+// re-render ONLY the fields whose issues changed — never their siblings. This is
+// the perf claim the maintainer flagged ("we can never re-render nodes if it was
+// preventable"). We drive a real live-validation pass and read the same counting
+// adapter: a sibling with no issue (and no issue change) must stay at zero.
+const validationSchema: JSONSchema = {
+  type: 'object',
+  required: ['username'],
+  properties: {
+    // gains an issue the moment you type fewer than 3 chars
+    username: { type: 'string', title: 'Username', minLength: 3 },
+    // unconstrained → never has an issue, so its snapshot never changes
+    note: { type: 'string', title: 'Note' },
+  },
+}
+
+function ValidationCountingHarness({
+  Counting,
+}: {
+  Counting: ReturnType<typeof createRenderer>
+}) {
+  const validator = useMemo(() => createAjvValidator(validationSchema), [])
+  const { form, revalidate, errors } = useSchemaForm(validationSchema, {
+    validator,
+  })
+  return (
+    <form noValidate onChange={revalidate}>
+      <ValidationProvider issues={errors}>
+        <Counting form={form} />
+      </ValidationProvider>
+    </form>
+  )
+}
+
+describe('validation render-count contract (ADR 023)', () => {
+  it('a field gaining an issue re-renders only that field, not its siblings', async () => {
+    const counts: Counts = {}
+    const Counting = createRenderer(countingAdapter(counts))
+    const screen = await render(<ValidationCountingHarness Counting={Counting} />)
+
+    reset(counts)
+    // type an invalid value into username (minLength 3); `note` stays valid
+    await screen.getByRole('textbox', { name: 'Username' }).fill('a')
+    await expect
+      .poll(() => document.querySelectorAll('.jsf-field-errors').length)
+      .toBe(1)
+
+    // the sibling never had/has an issue → its snapshot is referentially stable,
+    // so it must not have re-rendered at all (no Context fan-out)
+    expect(counts['field.root:note'] ?? 0).toBe(0)
+    expect(counts['field.input:note'] ?? 0).toBe(0)
+    // the changed field did re-render (to surface its error + aria wiring)
+    expect(counts['field.root:username'] ?? 0).toBeGreaterThan(0)
   })
 })

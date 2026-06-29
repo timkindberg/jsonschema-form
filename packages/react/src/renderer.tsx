@@ -36,15 +36,17 @@ import {
   useRef,
   useCallback,
   useContext,
+  useLayoutEffect,
+  useSyncExternalStore,
   createContext,
   memo,
   Fragment,
   type ReactNode,
 } from 'react'
+import { createIssueStore, EMPTY_ISSUES, type IssueStore } from './issueStore'
 import {
   createContinuation,
   mergeAdapter,
-  groupIssuesByPath,
   type Continuation,
   type RendererAdapter,
   type PartialAdapter,
@@ -160,24 +162,27 @@ function DefaultGroupLabel({ text }: { text: string }): ReactNode {
 }
 
 // ---------------------------------------------------------------------------
-// Validation display (ADR 019) — runtime state, NOT an IR part.
+// Validation display (ADR 019 + ADR 023) — runtime state, NOT an IR part.
 //
-// Validation issues are produced at submit by a side-loaded `Validator` and are
-// pure runtime state, so they live in React Context keyed by `node.path` — never
-// in the schema-derived `parts`. The default empty map means a field with no
-// issues (and any tree rendered with no `ValidationProvider`, e.g. the
-// conformance oracle) emits NO error markup, so React still matches vanilla.
+// Validation issues are produced by a side-loaded `Validator` (at submit or live)
+// and are pure runtime state, so they never live in the schema-derived `parts`.
+// They are held in an external per-path store (ADR 023) read through
+// `useSyncExternalStore`, NOT a single Context value: a Context update re-renders
+// every consumer (the whole form on one keystroke — the RJSF perf trap), whereas
+// the store hands each field a stable per-path snapshot, so a validation pass
+// re-renders only the fields whose issues actually changed. With no
+// `ValidationProvider` (the store is `null` — e.g. the conformance oracle) every
+// field reads `EMPTY_ISSUES` and emits NO error markup, so React still matches
+// the vanilla oracle.
 // ---------------------------------------------------------------------------
 
-const EMPTY_ISSUES: ValidationIssue[] = []
-const ValidationContext = createContext<Map<string, ValidationIssue[]>>(
-  new Map()
-)
+const ValidationStoreContext = createContext<IssueStore | null>(null)
 
 /**
- * Provide submit-time issues to the fields below (ADR 019). A stable module-level
- * type: updating `issues` re-renders only the per-field error consumers (and
- * recomputes the path map), leaving the uncontrolled inputs mounted in place.
+ * Provide validation issues to the fields below (ADR 019/023). Holds one store
+ * per provider instance and feeds it the latest `issues` after each render; the
+ * store diffs per path and notifies, so only the fields whose issues changed
+ * re-render — uncontrolled inputs stay mounted with their typed values.
  */
 export function ValidationProvider({
   issues,
@@ -186,29 +191,48 @@ export function ValidationProvider({
   issues: ValidationIssue[]
   children: ReactNode
 }): ReactNode {
-  const byPath = useMemo(() => groupIssuesByPath(issues), [issues])
+  // One store per provider instance — lazy-init via useState so it's created
+  // once and stays referentially stable across renders (no ref-in-render).
+  const [store] = useState(() => createIssueStore(issues))
+  // Push new issues into the store after commit (never during render). The store
+  // preserves array identity for unchanged paths, so this notifies only the
+  // fields that actually changed.
+  useLayoutEffect(() => {
+    store.setResult(issues)
+  }, [store, issues])
   return (
-    <ValidationContext.Provider value={byPath}>
+    <ValidationStoreContext.Provider value={store}>
       {children}
-    </ValidationContext.Provider>
+    </ValidationStoreContext.Provider>
   )
 }
 
-/** The issues for one field path (empty array when none) — for custom renderers. */
+const NEVER_SUBSCRIBE = () => () => {}
+const getEmptyIssues = () => EMPTY_ISSUES
+
+/**
+ * The issues for one field path (empty array when none) — for custom renderers.
+ * Subscribes to ONLY this path's slice via `useSyncExternalStore`, so this field
+ * re-renders only when its own issues change (ADR 023). No provider → always
+ * `EMPTY_ISSUES`, no subscription.
+ */
 export function useFieldIssues(path: string): ValidationIssue[] {
-  return useContext(ValidationContext).get(path) ?? EMPTY_ISSUES
+  const store = useContext(ValidationStoreContext)
+  return useSyncExternalStore(
+    store ? store.subscribe : NEVER_SUBSCRIBE,
+    store ? () => store.getIssues(path) : getEmptyIssues,
+    store ? () => store.getIssues(path) : getEmptyIssues
+  )
 }
 
 /** All current issues (flat) — for summaries and custom UX. */
 export function useValidationIssues(): ValidationIssue[] {
-  const byPath = useContext(ValidationContext)
-  return useMemo(() => {
-    const all: ValidationIssue[] = []
-    for (const issues of byPath.values()) {
-      all.push(...issues)
-    }
-    return all
-  }, [byPath])
+  const store = useContext(ValidationStoreContext)
+  return useSyncExternalStore(
+    store ? store.subscribe : NEVER_SUBSCRIBE,
+    store ? store.getAll : getEmptyIssues,
+    store ? store.getAll : getEmptyIssues
+  )
 }
 
 /** Stable control `id` for a field path (matches Core's `attrs.id`). */

@@ -98,12 +98,14 @@ of truth for **reported** issues; native attrs are the source of truth for
 - **ADR 011 updated in practice** — native form-state + side-loaded validation covers
   both submit-time and live validation; reactive form-state adapters remain optional
   for other reactivity needs.
-- **Performance cost per event** — each `revalidate` call runs the validator over
-  the full assembled data **and** updates `ValidationProvider`'s context, so
-  **every** `useFieldIssues` consumer re-renders (O(fields) React work), not
-  just the fields with issues. Input widgets themselves do not remount (memo
-  bail), but the validation pass is not free. **Debounce** and **field/group-scoped
-  triggers** are the intended mitigations and remain deferred (future beads).
+- **Performance: only changed fields re-render (ADR 023).** Issues are held in a
+  per-path subscription store read via `useSyncExternalStore` — **not** a single
+  Context — so a validation pass re-renders only the fields whose issues actually
+  changed, never the whole form. This is pinned by a render-count test ("a field
+  gaining an issue re-renders only that field, not its siblings"). The remaining
+  per-event cost is the **validator runtime** (a full-form pass); **debounce** and
+  **field/group-scoped triggers** are the intended mitigations and remain deferred
+  (future beads).
 
 ## Alternatives Considered
 
@@ -119,4 +121,5 @@ of truth for **reported** issues; native attrs are the source of truth for
 
 **Relates to:** ADR 011 (form-state shallow slot — native adapter reactivity
 question), ADR 013 (consumer owns `<form>`), ADR 019 (Validator seam),
-ADR 012 (native HTML attrs as constrain layer).
+ADR 012 (native HTML attrs as constrain layer), ADR 023 (the per-path
+subscription store that makes this re-render only changed fields).

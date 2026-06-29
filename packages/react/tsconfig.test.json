@@ -7,7 +7,7 @@
     "types": ["vitest/globals", "@vitest/browser"]
   },
   "include": [
-    "src/**/*.test.ts",
+    "src/**/*.ts",
     "src/**/*.test.tsx",
     "src/**/*.tsx",
     "vitest.setup.ts"
