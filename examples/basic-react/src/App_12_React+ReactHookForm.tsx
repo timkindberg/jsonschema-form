@@ -6,11 +6,12 @@
 //
 // What this proves
 // ----------------
-//  1. Our `Validator` seam (ADR 019) survives unchanged as an RHF *resolver*.
-//     `validatorResolver` is a small shim: call the (pure) validator and fan its
-//     flat issue list out into RHF's nested error shape. AJV/Zod/Valibot all slot
-//     in because they already implement `Validator`. RHF does NOT make our
-//     validation layer redundant — it *consumes* it.
+//  1. Our `Validator` seam (ADR 019) survives unchanged — handed to RHF as a
+//     Standard Schema via `toStandardSchema` (ADR 026). `@hookform/resolvers`'s
+//     `standardSchemaResolver` calls `schema['~standard'].validate()` and maps
+//     issues into RHF's nested error shape (no bespoke resolver shim). AJV/Zod/
+//     Valibot all slot in because they already implement `Validator`. RHF does
+//     NOT make our validation layer redundant — it *consumes* it.
 //  2. RHF owns form *state* (values, touched, submit) — it replaces the ADR-023
 //     issue store, which is exactly the swappable form-state slot. Our Core tree
 //     + `renderNode` seam (ADR 010/013) render the structure; one `register()`
@@ -49,14 +50,16 @@ import {
   useFormContext,
   useFormState,
 } from 'react-hook-form'
-import type { Resolver, FieldValues, FieldErrors } from 'react-hook-form'
-import { jsonSchemaToTree } from '@jsonschema-form/core'
-import type { JSONSchema, Validator } from '@jsonschema-form/core'
+import type { FieldValues } from 'react-hook-form'
+import type { StandardSchemaV1 } from '@standard-schema/spec'
+import { standardSchemaResolver } from '@hookform/resolvers/standard-schema'
+import { jsonSchemaToTree, toStandardSchema } from '@jsonschema-form/core'
+import type { JSONSchema } from '@jsonschema-form/core'
 import { SchemaFields } from '@jsonschema-form/react'
 import type { EField, RenderNode } from '@jsonschema-form/react'
 import { createAjvValidator } from '@jsonschema-form/validation-ajv'
 
-const schema: JSONSchema = {
+const schema = {
   type: 'object',
   required: ['firstName', 'email'],
   properties: {
@@ -74,25 +77,7 @@ const schema: JSONSchema = {
       minimum: 18,
     },
   },
-}
-
-// --- The whole adapter: our Validator -> an RHF resolver ---------------------
-// Flat issues (path + message) fan out into RHF's nested error object. Empty
-// path (root issue) is skipped — it has no field to attach to.
-function setNested(
-  target: Record<string, unknown>,
-  path: string,
-  leaf: unknown
-): void {
-  const keys = path.split('.')
-  let obj = target
-  for (let i = 0; i < keys.length - 1; i++) {
-    const k = keys[i]
-    if (typeof obj[k] !== 'object' || obj[k] === null) obj[k] = {}
-    obj = obj[k] as Record<string, unknown>
-  }
-  obj[keys[keys.length - 1]] = leaf
-}
+} satisfies JSONSchema
 
 function getNested(obj: unknown, path: string): unknown {
   return path
@@ -101,30 +86,6 @@ function getNested(obj: unknown, path: string): unknown {
       (acc, k) => (acc == null ? acc : (acc as Record<string, unknown>)[k]),
       obj
     )
-}
-
-function validatorResolver(validator: Validator): Resolver<FieldValues> {
-  return (values) => {
-    // No defensive clone. The Validator contract is pure (ADR 025): it won't
-    // mutate RHF's live values, so we hand them over directly. Coercion comes
-    // back as `result.data` (e.g. "25" -> 25), which we return as RHF's values so
-    // the submit handler receives typed data. (Earlier this round-tripped through
-    // JSON to dodge AJV's in-place `coerceTypes` mutation; that footgun now lives
-    // in the adapter, fixed once, for every consumer.)
-    const result = validator(values)
-    if (result.valid) {
-      return { values: (result.data ?? values) as FieldValues, errors: {} }
-    }
-    const errors: Record<string, unknown> = {}
-    for (const issue of result.issues) {
-      if (issue.path === '') continue
-      setNested(errors, issue.path, {
-        type: issue.keyword ?? 'validation',
-        message: issue.message,
-      })
-    }
-    return { values: {}, errors: errors as FieldErrors<FieldValues> }
-  }
 }
 
 // --- A field, wired to RHF through our renderNode seam -----------------------
@@ -203,7 +164,14 @@ function RHFField({
 export default function App() {
   const form = useMemo(() => jsonSchemaToTree(schema), [])
   const validator = useMemo(() => createAjvValidator(schema), [])
-  const resolver = useMemo(() => validatorResolver(validator), [validator])
+  const resolver = useMemo(
+    () =>
+      standardSchemaResolver(
+        // Core emits input: unknown; RHF's resolver expects FieldValues at the boundary.
+        toStandardSchema(validator) as StandardSchemaV1<FieldValues, FieldValues>
+      ),
+    [validator]
+  )
   const methods = useForm({ resolver })
   const [submitted, setSubmitted] = useState<FieldValues | null>(null)
 
@@ -212,12 +180,13 @@ export default function App() {
       <h1>React Hook Form as the form-state layer (recipe, ADR 024)</h1>
       <p>
         RHF owns state + submit; our Core tree + <code>renderNode</code> render
-        the structure; our <code>Validator</code> (AJV) is reused as RHF&apos;s{' '}
-        <code>resolver</code>. Errors show on submit and re-validate on change
-        (default RHF mode); switching to <code>mode: &quot;onTouched&quot;</code>{' '}
-        gives touched-gated display with no extra code, because RHF field-scopes
-        resolver errors itself. This is a copy-paste recipe, not a published
-        adapter.
+        the structure; our <code>Validator</code> (AJV) is adapted to a Standard
+        Schema via <code>toStandardSchema</code> (ADR 026) and wired into RHF
+        through <code>standardSchemaResolver</code>. Errors show on submit and
+        re-validate on change (default RHF mode); switching to{' '}
+        <code>mode: &quot;onTouched&quot;</code> gives touched-gated display with
+        no extra code, because RHF field-scopes resolver errors itself. This is a
+        copy-paste recipe, not a published adapter.
       </p>
 
       <FormProvider {...methods}>
