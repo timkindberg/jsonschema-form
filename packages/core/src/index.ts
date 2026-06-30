@@ -45,6 +45,16 @@ export { jsonSchemaToTree } from './parser/index'
 // Adapters (e.g. @jsonschema-form/validation-ajv) implement `Validator`.
 export { groupIssuesByPath } from './validation'
 
+// Standard Schema interop (ADR 026) — let the Validator seam emit/consume the
+// cross-library https://standardschema.dev interface (RHF, TanStack Form, Zod…).
+export { toStandardSchema, fromStandardSchema } from './standardSchema'
+export type {
+  StandardSchemaV1,
+  StandardSchemaV1Props,
+  StandardSchemaV1Result,
+  StandardSchemaV1Issue,
+} from './standardSchema'
+
 // Continuation engine (ADR 014) — the generic, front-end-agnostic fold that
 // React/vanilla/… renderers instantiate at their own result type `R`.
 export { createContinuation, mergeAdapter } from './continuation/engine'
