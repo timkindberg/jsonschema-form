@@ -1,5 +1,6 @@
 import type { JSONSchema, GroupNode } from '../types'
 import { createGroupNode, isObjectSchema } from './groupNode'
+import { mergeAllOf } from './mergeAllOf'
 import { resolveLocalRefs } from './resolveRefs'
 
 export function jsonSchemaToTree(schema: JSONSchema): GroupNode {
@@ -8,7 +9,8 @@ export function jsonSchemaToTree(schema: JSONSchema): GroupNode {
   }
 
   const resolvedSchema = resolveLocalRefs(schema)
+  const mergedSchema = mergeAllOf(resolvedSchema)
 
   // Root is just a GroupNode with empty path
-  return createGroupNode('', resolvedSchema, false)
+  return createGroupNode('', mergedSchema, false)
 }
