@@ -1,7 +1,7 @@
 # ADR 026: Speak Standard Schema at the Boundary, Don't Become It
 
 **Date:** 2026-06-30
-**Status:** Proposed
+**Status:** Accepted
 **Deciders:** Tim Kindberg
 
 ## Context
