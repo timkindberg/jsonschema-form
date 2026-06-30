@@ -4,6 +4,7 @@ import type {
   JSONSchema,
   Validator,
   ValidationIssue,
+  InferData,
 } from '@jsonschema-form/core'
 
 export interface AjvValidatorOptions {
@@ -37,11 +38,18 @@ export interface AjvValidatorOptions {
  * registered by default — AJV v8 ignores `format` otherwise, so an
  * `{ format: 'email' }` field would silently never fail. Skip it with
  * `options.formats: false` if you register your own.
+ *
+ * Per the {@link Validator} purity invariant (ADR 025) the input is **never
+ * mutated**: AJV's `coerceTypes` would otherwise rewrite the caller's object in
+ * place, so each call validates a `structuredClone`. The coerced clone is
+ * returned as `result.data` — that is where typed values (e.g. `"18"` → `18`)
+ * are surfaced, not via a side effect. When the schema is a literal, `result.data`
+ * is typed via {@link InferData}; otherwise it widens to `unknown`.
  */
-export function createAjvValidator(
-  schema: JSONSchema,
+export function createAjvValidator<const S extends JSONSchema>(
+  schema: S,
   options: AjvValidatorOptions = {}
-): Validator {
+): Validator<InferData<S>> {
   const ajv = new Ajv({
     allErrors: true,
     strict: false,
@@ -52,9 +60,13 @@ export function createAjvValidator(
   const validate = ajv.compile(schema as object)
 
   return (data: unknown) => {
-    const valid = validate(data) === true
+    // Clone first: `coerceTypes` mutates in place, and a Validator must not touch
+    // the caller's object (ADR 025). AJV coerces the clone; we hand it back as
+    // `data` so callers get typed values without the mutation footgun.
+    const coerced = structuredClone(data)
+    const valid = validate(coerced) === true
     const issues = valid ? [] : (validate.errors ?? []).map(toIssue)
-    return { valid, issues }
+    return { valid, issues, data: coerced as InferData<S> }
   }
 }
 

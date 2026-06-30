@@ -90,5 +90,27 @@ export function runValidatorContract(target: ValidatorContractTarget): void {
         expect(issue.message.length).toBeGreaterThan(0)
       }
     })
+
+    // ADR 025 — the two universal `data` invariants. (Coercion *content* is
+    // adapter-specific — AJV coerces by default, Zod does not — so that is
+    // asserted in each adapter's own suite, not here.)
+
+    it('does not mutate its input (purity)', () => {
+      const input = { name: 'Tim', contacts: [{ email: 'a@b' }] }
+      const snapshot = structuredClone(input)
+      validate(input)
+      expect(input).toEqual(snapshot)
+    })
+
+    it('never returns `data` aliased to the input', () => {
+      // Input that needs no coercion, so a coercing and a non-coercing validator
+      // agree: when `data` is present it is a *fresh* value equal to the input.
+      const input = { name: 'Tim', contacts: [{ email: 'a@b' }] }
+      const result = validate(input)
+      if (result.data !== undefined) {
+        expect(result.data).not.toBe(input)
+        expect(result.data).toEqual(input)
+      }
+    })
   })
 }

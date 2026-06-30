@@ -103,20 +103,23 @@ Schema's success result is `{ value }`, and adding `data` here is a deliberate
 step toward that shape — a later async+Standard-Schema ADR maps our
 `{ valid, issues, data }` onto `{ value, issues }` with no further contract churn.
 
-### 4. The shared contract suite gains two assertions
+### 4. The contract suite gains universal invariants; coercion is per-adapter
 
-The validator-agnostic contract suite (ADR 020) — already run against both AJV
-and Zod — grows two cases, turning both invariants into **gated** facts:
+The validator-agnostic suite (ADR 020) — already run against AJV, Zod, and the
+throwaway fake — grows the two cases that hold for **every** validator:
 
-- **Purity:** snapshot the input (deep clone), validate, assert the original
-  input is deep-equal to its snapshot (unchanged).
-- **Transformed data:** for a coercion case (string `"18"` against
-  `{ type: 'number' }`), assert `result.data` reflects the coerced value **and**
-  the input is still unchanged; for a no-transform case, `result.data` (when
-  present) deep-equals the input.
+- **Purity:** snapshot the input (deep clone), validate, assert the input is
+  deep-equal to its snapshot (unchanged).
+- **No aliasing:** on a no-coercion-needed input, when `result.data` is present
+  assert it is *not the same reference* as the input but *is* deep-equal to it —
+  so a consumer can never mutate its own state through `result.data`.
 
-Strengthening the gate is always in scope; this makes "validators don't mutate"
-impossible to regress silently.
+Coercion *content* is deliberately **not** in the shared suite: AJV coerces by
+default while plain Zod does not, so "string `"25"` becomes number `25`" is not a
+cross-validator guarantee. Each adapter asserts its own coercion in its own
+suite (AJV via `coerceTypes`; Zod via `z.coerce`), checking `result.data` carries
+the coerced value *and* the input is untouched. Strengthening the gate is always
+in scope; this makes "validators don't mutate" impossible to regress silently.
 
 ## Consequences
 

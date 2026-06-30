@@ -59,4 +59,18 @@ describe('createZodValidator — Zod specifics', () => {
     const issue = validate({ name: 'T' }).issues.find((i) => i.path === 'name')
     expect(issue?.message.length).toBeGreaterThan(0)
   })
+
+  it('returns the parsed output as result.data, including coercion (ADR 025)', () => {
+    const validate = createZodValidator(
+      z.object({ name: z.string(), age: z.coerce.number() })
+    )
+    const input = { name: 'Tim', age: '25' }
+    const result = validate(input)
+    expect(result.valid).toBe(true)
+    // z.coerce.number() turns "25" into 25 in the parsed output...
+    expect(result.data).toEqual({ name: 'Tim', age: 25 })
+    // ...and Zod never mutates the caller's object.
+    expect(input).toEqual({ name: 'Tim', age: '25' })
+    expect(result.data).not.toBe(input)
+  })
 })

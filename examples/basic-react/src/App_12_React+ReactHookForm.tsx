@@ -7,7 +7,7 @@
 // What this proves
 // ----------------
 //  1. Our `Validator` seam (ADR 019) survives unchanged as an RHF *resolver*.
-//     `validatorResolver` is a small shim: clone, call the validator, fan its
+//     `validatorResolver` is a small shim: call the (pure) validator and fan its
 //     flat issue list out into RHF's nested error shape. AJV/Zod/Valibot all slot
 //     in because they already implement `Validator`. RHF does NOT make our
 //     validation layer redundant — it *consumes* it.
@@ -32,9 +32,9 @@
 //    which `createAjvValidator` now registers by default.
 //  - A mutating validator must NEVER touch the form library's state. AJV's
 //    `coerceTypes` mutates in place; handing it RHF's live values corrupted RHF's
-//    change tracking, so a fixed field's error never cleared. The resolver now
-//    validates a clone (which also drops `undefined`, so an empty optional number
-//    reads as absent, not "must be a number").
+//    change tracking, so a fixed field's error never cleared. This drove ADR 025:
+//    the `Validator` contract is now pure (the AJV adapter clones internally and
+//    returns coerced data as `result.data`), so this recipe needs no clone.
 //
 // Friction found (informs the seam, not blocking)
 // -----------------------------------------------
@@ -105,15 +105,16 @@ function getNested(obj: unknown, path: string): unknown {
 
 function validatorResolver(validator: Validator): Resolver<FieldValues> {
   return (values) => {
-    // Clone before validating. AJV's `coerceTypes` MUTATES the object in place;
-    // handing it RHF's live value object corrupts RHF's change tracking (an error
-    // wouldn't clear after you fixed the field). The JSON round-trip also drops
-    // `undefined` keys, so an empty optional field reads as "absent", not "must be
-    // a number". This is the real seam finding: a mutating validator must never
-    // touch the form library's own state.
-    const data = JSON.parse(JSON.stringify(values)) as FieldValues
-    const result = validator(data)
-    if (result.valid) return { values: data, errors: {} }
+    // No defensive clone. The Validator contract is pure (ADR 025): it won't
+    // mutate RHF's live values, so we hand them over directly. Coercion comes
+    // back as `result.data` (e.g. "25" -> 25), which we return as RHF's values so
+    // the submit handler receives typed data. (Earlier this round-tripped through
+    // JSON to dodge AJV's in-place `coerceTypes` mutation; that footgun now lives
+    // in the adapter, fixed once, for every consumer.)
+    const result = validator(values)
+    if (result.valid) {
+      return { values: (result.data ?? values) as FieldValues, errors: {} }
+    }
     const errors: Record<string, unknown> = {}
     for (const issue of result.issues) {
       if (issue.path === '') continue

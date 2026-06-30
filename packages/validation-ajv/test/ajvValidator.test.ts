@@ -54,6 +54,20 @@ describe('createAjvValidator — AJV specifics', () => {
     expect(validate({ age: '-1' }).valid).toBe(false)
   })
 
+  it('surfaces coerced values in result.data without mutating the input (ADR 025)', () => {
+    const validate = createAjvValidator({
+      type: 'object',
+      properties: { age: { type: 'number', minimum: 0 } },
+    })
+    const input = { age: '25' }
+    const result = validate(input)
+    // coercion is observable through `data`...
+    expect(result.data).toEqual({ age: 25 })
+    // ...and the caller's object is untouched (still the original string).
+    expect(input).toEqual({ age: '25' })
+    expect(result.data).not.toBe(input)
+  })
+
   it('enforces standard formats (email) by default via ajv-formats', () => {
     const validate = createAjvValidator({
       type: 'object',
