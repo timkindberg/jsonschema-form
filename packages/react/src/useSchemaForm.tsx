@@ -55,10 +55,11 @@ export interface UseSchemaFormOptions {
  * `<ValidationProvider issues={errors}>` (kept explicit so you own where issues
  * live — ADR 013).
  *
- * For React-Hook-Form-style **touched-gated errors** (ADR 027), wire
- * `onBlur={handleBlur}` and pass `touched`/`submitted` plus
- * `showErrorsWhen="touched"` to the provider: a field's error stays quiet until
- * it blurs, and submit reveals all. Default is `'always'` (unchanged).
+ * Error display is **touched-gated by default** (ADR 027, React-Hook-Form-style):
+ * a field's error stays quiet until it blurs, and a submit attempt reveals all.
+ * So wire `onBlur={handleBlur}` and pass `touched`/`submitted` to the provider
+ * (below) — otherwise errors never appear. Pass `showErrorsWhen="always"` to opt
+ * back into reporting the instant an issue exists.
  *
  * `SchemaFields` renders the form's *content only* — wrap it in your own
  * `<form>` and submit (chrome is the consumer's, ADR 013):
@@ -69,12 +70,7 @@ export interface UseSchemaFormOptions {
  *   useSchemaForm(schema, { validator: createAjvValidator(schema) })
  * return (
  *   <form noValidate onSubmit={submit(onValid)} onInput={revalidate} onBlur={handleBlur}>
- *     <ValidationProvider
- *       issues={errors}
- *       touched={touched}
- *       submitted={submitted}
- *       showErrorsWhen="touched"
- *     >
+ *     <ValidationProvider issues={errors} touched={touched} submitted={submitted}>
  *       <SchemaFields />
  *     </ValidationProvider>
  *     <button type="submit">Submit</button>

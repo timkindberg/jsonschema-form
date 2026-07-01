@@ -240,9 +240,11 @@ function ValidationCountingHarness({
   const { form, revalidate, errors } = useSchemaForm(validationSchema, {
     validator,
   })
+  // This suite is about issue-store fan-out (ADR 023), not the touched display
+  // policy (ADR 027) — report immediately so a new issue renders on change.
   return (
     <form noValidate onChange={revalidate}>
-      <ValidationProvider issues={errors}>
+      <ValidationProvider issues={errors} showErrorsWhen="always">
         <Counting form={form} />
       </ValidationProvider>
     </form>

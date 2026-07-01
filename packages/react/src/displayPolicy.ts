@@ -11,16 +11,21 @@
 /**
  * When a field's validation errors become visible.
  *
- * - `'always'` — as soon as the validator produces them (pre-ADR-027 behaviour,
- *   and the default so existing consumers are unchanged).
  * - `'touched'` — only after the field is touched (focus→blur), plus everything
- *   once the form is submitted (React Hook Form's default UX).
+ *   once the form is submitted (React Hook Form's default UX). **The default.**
+ * - `'always'` — as soon as the validator produces them (pre-ADR-027 behaviour);
+ *   the opt-out for consumers that want to report immediately.
  * - `'submit'` — only after a submit attempt.
  */
 export type ShowErrorsWhen = 'always' | 'touched' | 'submit'
 
-/** The default policy: report immediately (backward-compatible). */
-export const DEFAULT_SHOW_ERRORS_WHEN: ShowErrorsWhen = 'always'
+/**
+ * The default policy (ADR 027): quiet until touched, RHF-style. Note this means a
+ * `ValidationProvider` must be fed `touched`/`submitted` (as `useSchemaForm`
+ * does) for errors to appear; pass `showErrorsWhen="always"` to report the moment
+ * an issue exists regardless of touch.
+ */
+export const DEFAULT_SHOW_ERRORS_WHEN: ShowErrorsWhen = 'touched'
 
 /**
  * Whether one field's errors should be displayed, given the policy and the

@@ -202,11 +202,12 @@ const EMPTY_TOUCHED: ReadonlySet<string> = new Set()
  *
  * `issues` is mirrored into the per-path issue store as before. `touched` (the
  * set of blurred field paths), `submitted`, and `showErrorsWhen` drive *when*
- * each field reveals its errors: the default `'always'` shows them as soon as
- * they exist (unchanged behaviour), while `'touched'`/`'submit'` gate on this
- * field's touched slice + the submit flag. `useSchemaForm` owns that state (see
- * its `handleBlur`/`submit`). Both stores diff per path and notify, so a
- * keystroke or a blur re-renders only the field it concerns.
+ * each field reveals its errors: the default `'touched'` gates on this field's
+ * touched slice + the submit flag (RHF-style — so you must feed `touched`/
+ * `submitted`, as `useSchemaForm` does, or nothing appears), `'submit'` waits for
+ * a submit attempt, and `'always'` shows issues the moment they exist. Both
+ * stores diff per path and notify, so a keystroke or a blur re-renders only the
+ * field it concerns.
  */
 export function ValidationProvider({
   issues,

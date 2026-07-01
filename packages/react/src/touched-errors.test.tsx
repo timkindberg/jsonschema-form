@@ -3,8 +3,9 @@
 // Orthogonal to *when* validation runs (ADR 021): here the validator produces
 // issues live, but a field's error stays hidden until the field is touched
 // (focus→blur), and a submit attempt reveals everything — React Hook Form's
-// default UX. `useSchemaForm` owns touched/submitted; `showErrorsWhen` on the
-// provider picks the policy. Default `'always'` is unchanged (covered elsewhere).
+// default UX, and now the library default (ADR 027). `useSchemaForm` owns
+// touched/submitted; `showErrorsWhen` on the provider picks the policy.
+// `'always'` is the opt-out that reports immediately.
 
 import { useMemo } from 'react'
 import { describe, it, expect } from 'vitest'
@@ -24,7 +25,9 @@ const schema: JSONSchema = {
   },
 }
 
-function Harness({ mode }: { mode: ShowErrorsWhen }) {
+// `mode` is optional: omitting it exercises the provider's default policy
+// (ADR 027 makes that `'touched'`).
+function Harness({ mode }: { mode?: ShowErrorsWhen }) {
   const validator = useMemo(() => createAjvValidator(schema), [])
   const { SchemaFields, submit, revalidate, errors, handleBlur, touched, submitted } =
     useSchemaForm(schema, { validator })
@@ -59,6 +62,23 @@ const control = (path: string) =>
 const errorEls = () => document.querySelectorAll('.jsf-field-errors')
 
 describe('touched-gated error display (ADR 027)', () => {
+  it('default policy is touched: a live error stays hidden until the field blurs', async () => {
+    // No `showErrorsWhen` prop → the provider's default applies.
+    await render(<Harness />)
+
+    const username = control('username')
+    username.focus()
+    dispatchInput(username, 'a') // invalid live, but untouched → hidden
+
+    await new Promise((r) => setTimeout(r, 30))
+    expect(document.getElementById(fieldErrorId('username'))).toBeNull()
+
+    username.blur()
+    await expect
+      .poll(() => document.getElementById(fieldErrorId('username')))
+      .not.toBeNull()
+  })
+
   it("'touched': keeps a live error hidden until the field blurs, then shows it", async () => {
     await render(<Harness mode="touched" />)
 
@@ -96,7 +116,7 @@ describe('touched-gated error display (ADR 027)', () => {
     await expect.poll(() => errorEls().length).toBe(2)
   })
 
-  it("'always' (default policy) shows a live error immediately, no touch needed", async () => {
+  it("'always' (opt-out) shows a live error immediately, no touch needed", async () => {
     await render(<Harness mode="always" />)
 
     const username = control('username')

@@ -45,7 +45,7 @@ function shouldDisplayFieldErrors(
 ```
 
 - `'always'` → `true` (report as soon as the validator produces the issue — the
-  current, pre-027 behaviour).
+  pre-027 behaviour, now the explicit opt-out).
 - `'touched'` → `touched || submitted` (RHF-style: quiet until the field blurs,
   then everything on submit).
 - `'submit'` → `submitted` (only after a submit attempt).
@@ -70,24 +70,40 @@ re-render to reveal all errors is acceptable and intended.
   field's dot-path) touched, one handler for the whole form — and flips
   `submitted` inside `submit`.
 - `ValidationProvider` gains `touched` / `submitted` / `showErrorsWhen` props
-  (all optional; omitted ⇒ `'always'`, i.e. today's behaviour) and mirrors them
-  into the touched store + a small policy context, exactly as it already mirrors
-  `issues` into the issue store.
+  (all optional; `showErrorsWhen` omitted ⇒ `'touched'`, the default policy) and
+  mirrors them into the touched store + a small policy context, exactly as it
+  already mirrors `issues` into the issue store.
 - The default renderer gates on a new `useFieldErrorDisplay(path)` hook (reads the
   field's touched slice + `submitted` + `mode`): `DefaultFieldErrors` renders
   nothing until display is allowed, and the `aria-invalid`/`aria-describedby`
   wiring is gated the same way so a11y and visible state never disagree.
 
-### Default is `'always'` (backward-compatible), `'touched'` is the recommended opt-in
+### Default is `'touched'`; `'always'` is the opt-out
 
-Defaulting to `'always'` keeps every existing consumer and test unchanged and
-makes 027 purely additive. The demo and docs lead with `'touched'` because it is
-the better UX. **Open question for the maintainer:** should the *library* default
-flip to `'touched'`? That is a (reversible) behaviour change for consumers, so it
-is called out here rather than decided unilaterally.
+The library default is `'touched'` — the RHF-style UX is what almost every form
+actually wants, and shipping the good behaviour by default beats making everyone
+opt in. `'always'` (report the instant an issue exists) stays a first-class,
+one-prop opt-out for the cases that want it (live-reporting demos, dashboards,
+anything that surfaces issues eagerly).
+
+The consequence of the default being `'touched'` is that display now *depends on
+state the provider must be fed*: a `ValidationProvider` only reveals a field's
+error once that field is in `touched` or `submitted` is set. `useSchemaForm`
+supplies both (`handleBlur` marks touched; `submit` flips `submitted`), so the
+common wiring "just works". But a bare `<ValidationProvider issues={errors}>`
+with no `touched`/`submitted` will now show **nothing** — pass those props (the
+normal path) or `showErrorsWhen="always"` to report unconditionally.
 
 ## Consequences
 
+- **Behaviour change, not purely additive.** Flipping the default to `'touched'`
+  changes what existing consumers see: errors stay quiet until touch/submit. The
+  migration is one prop — `showErrorsWhen="always"` restores the pre-027 "report
+  immediately" behaviour. In-repo, feature tests that assert error *visibility*
+  for a non-display reason (a11y wiring, the ADR 021 reactive suite, the ADR 023
+  render-count contract) opt into `'always'` so each stays scoped to its own
+  concern; submit-time and touched suites feed `touched`/`submitted` and exercise
+  the new default directly.
 - **Verified, not hoped.** A render-count test asserts blurring field A reveals
   only A's error and does **not** re-render sibling B, and that submit reveals all
   — the ADR 023 invariant extended to the touched dimension.
