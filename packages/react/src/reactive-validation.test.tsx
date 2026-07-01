@@ -4,6 +4,11 @@
 // `onChange` (blur for text fields); the hook reads native FormData, runs the
 // side-loaded Validator, and updates the same `errors` state — inputs stay
 // uncontrolled.
+//
+// These tests assert *when validation runs* (the ADR 021 seam), not the ADR 027
+// touched display policy — so they use `showErrorsWhen="always"` to render any
+// issue the instant it exists. Touched-gating has its own suite
+// (touched-errors.test.tsx).
 
 import { useMemo } from 'react'
 import { describe, it, expect } from 'vitest'
@@ -29,7 +34,7 @@ function InputHarness() {
   })
   return (
     <form noValidate onInput={revalidate}>
-      <ValidationProvider issues={errors}>
+      <ValidationProvider issues={errors} showErrorsWhen="always">
         <SchemaFields />
       </ValidationProvider>
     </form>
@@ -43,7 +48,7 @@ function ChangeHarness() {
   })
   return (
     <form noValidate onChange={revalidate}>
-      <ValidationProvider issues={errors}>
+      <ValidationProvider issues={errors} showErrorsWhen="always">
         <SchemaFields />
       </ValidationProvider>
     </form>
@@ -55,7 +60,7 @@ function SubmitOnlyHarness() {
   const { SchemaFields, submit, errors } = useSchemaForm(schema, { validator })
   return (
     <form noValidate onSubmit={submit(() => {})}>
-      <ValidationProvider issues={errors}>
+      <ValidationProvider issues={errors} showErrorsWhen="always">
         <SchemaFields />
       </ValidationProvider>
       <button type="submit">Submit</button>
@@ -170,7 +175,7 @@ describe('reactive validation (ADR 021)', () => {
       })
       return (
         <form noValidate onInput={revalidate}>
-          <ValidationProvider issues={errors}>
+          <ValidationProvider issues={errors} showErrorsWhen="always">
             <SchemaFields />
           </ValidationProvider>
         </form>
