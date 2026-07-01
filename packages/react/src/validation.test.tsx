@@ -30,13 +30,18 @@ function Harness({
   onValid: (data: Record<string, unknown>) => void
 }) {
   const validator = useMemo(() => createAjvValidator(schema), [])
-  const { SchemaFields, submit, errors } = useSchemaForm(schema, { validator })
+  const { SchemaFields, submit, errors, submitted } = useSchemaForm(schema, {
+    validator,
+  })
   // `noValidate`: the schema renders native `required`/`pattern` attrs (ADR 012),
   // which would otherwise block submit before our JS validator runs. Opt out so
   // the side-loaded validator owns the UX.
+  //
+  // The default display policy is `'touched'` (ADR 027), so a submit attempt is
+  // what reveals these errors — feed `submitted` from the hook to prove it.
   return (
     <form noValidate onSubmit={submit(onValid)}>
-      <ValidationProvider issues={errors}>
+      <ValidationProvider issues={errors} submitted={submitted}>
         <SchemaFields />
       </ValidationProvider>
       <button type="submit">Submit</button>

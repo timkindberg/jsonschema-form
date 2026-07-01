@@ -44,11 +44,17 @@ describe('shouldDisplayFieldErrors (ADR 027)', () => {
     ).toBe(true)
   })
 
-  it('default policy is backward-compatible (always)', () => {
-    expect(DEFAULT_SHOW_ERRORS_WHEN).toBe('always')
+  it("default policy is 'touched' (RHF-style: quiet until touched/submitted)", () => {
+    expect(DEFAULT_SHOW_ERRORS_WHEN).toBe('touched')
     expect(
       shouldDisplayFieldErrors(DEFAULT_SHOW_ERRORS_WHEN, {
         touched: false,
+        submitted: false,
+      })
+    ).toBe(false)
+    expect(
+      shouldDisplayFieldErrors(DEFAULT_SHOW_ERRORS_WHEN, {
+        touched: true,
         submitted: false,
       })
     ).toBe(true)

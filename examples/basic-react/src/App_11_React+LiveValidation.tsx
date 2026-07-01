@@ -75,6 +75,13 @@ function App() {
         Omit live handlers and behaviour stays submit-only (ADR 019). Async
         validation, debounce, and field-scoped triggers are deferred.
       </p>
+      <p>
+        <strong>Display policy:</strong> this demo passes{' '}
+        <code>showErrorsWhen=&quot;always&quot;</code> so a live-reported error
+        appears the instant it exists — the point here is the validate-on-change
+        seam. The library default is <code>&quot;touched&quot;</code> (errors stay
+        quiet until a field blurs); see <code>App_13</code> for that UX.
+      </p>
 
       <form
         noValidate
@@ -82,7 +89,7 @@ function App() {
         onInput={revalidate}
         onChange={revalidate}
       >
-        <ValidationProvider issues={errors}>
+        <ValidationProvider issues={errors} showErrorsWhen="always">
           <ValidationSummary />
           <SchemaFields />
         </ValidationProvider>
