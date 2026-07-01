@@ -62,8 +62,10 @@ function FormWithValidation({
   formSchema?: JSONSchema
 }) {
   const form = useMemo(() => jsonSchemaToTree(formSchema), [formSchema])
+  // a11y wiring is about how a *shown* error is announced, not the touched
+  // display policy (ADR 027) — so report immediately here.
   return (
-    <ValidationProvider issues={issues}>
+    <ValidationProvider issues={issues} showErrorsWhen="always">
       {showSummary && <ValidationSummary />}
       <SchemaFields form={form} />
     </ValidationProvider>

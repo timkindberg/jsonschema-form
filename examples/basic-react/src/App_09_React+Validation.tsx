@@ -38,7 +38,10 @@ const schema: JSONSchema = {
 function App() {
   // Compile the schema once; the validator is the side-loaded slot.
   const validator = useMemo(() => createAjvValidator(schema), [])
-  const { SchemaFields, submit, errors } = useSchemaForm(schema, { validator })
+  // `submitAttempted` is the hook's submit flag; the default display policy is
+  // `'touched'` (ADR 027), so a submit attempt is what reveals these errors.
+  const { SchemaFields, submit, errors, submitted: submitAttempted } =
+    useSchemaForm(schema, { validator })
   const [submitted, setSubmitted] = useState<Record<string, unknown> | null>(
     null
   )
@@ -68,7 +71,7 @@ function App() {
       </p>
 
       <form noValidate onSubmit={submit(handleValid)}>
-        <ValidationProvider issues={errors}>
+        <ValidationProvider issues={errors} submitted={submitAttempted}>
           <ValidationSummary />
           <SchemaFields />
         </ValidationProvider>
