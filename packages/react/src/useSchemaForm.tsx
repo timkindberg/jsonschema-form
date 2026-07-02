@@ -8,11 +8,17 @@ import {
   type ReactNode,
   type SyntheticEvent,
 } from 'react'
-import { jsonSchemaToTree } from '@jsonschema-form/core'
+import {
+  jsonSchemaToTree,
+  present,
+  defaultPresentation,
+  layered,
+} from '@jsonschema-form/core'
 import type {
   JSONSchema,
   Validator,
   ValidationIssue,
+  PresentationResolver,
 } from '@jsonschema-form/core'
 import {
   SchemaFields as SchemaFieldsRenderer,
@@ -40,7 +46,19 @@ export interface UseSchemaFormOptions {
    * validation (behaviour is unchanged).
    */
   validator?: Validator
+  /**
+   * Consumer presentation resolver (ADR 029) — chooses/overrides a field's
+   * widget from its neutral `FieldFacts`, front-end-agnostically (it may match
+   * facts or reach into `facts.origin.schema`). Runs *above* the shipped
+   * `defaultPresentation` (later wins; return `undefined` to defer). This is how
+   * a DB-driven schema with no widget hints becomes e.g. a multiselect. Must be
+   * stable (memoize it or hoist to module scope) — a new reference re-presents.
+   */
+  resolvePresentation?: PresentationResolver
 }
+
+/** No-op resolver: defers entirely to `defaultPresentation`. */
+const passthrough: PresentationResolver = () => undefined
 
 /**
  * Convenience hook: compiles a JSON Schema into the Core form tree and hands
@@ -91,8 +109,19 @@ export function useSchemaForm(
   schema: JSONSchema,
   options: UseSchemaFormOptions = {}
 ) {
-  const { validator } = options
-  const form = useMemo(() => jsonSchemaToTree(schema), [schema])
+  const { validator, resolvePresentation } = options
+  // Parse → present (ADR 029): the default rule reproduces the parser's old
+  // widget choices (identity-preserving, so no override means the same tree),
+  // and a consumer resolver layers on top. `form` feeds both render and submit,
+  // so an overridden widget (e.g. multiselect) is honoured by submit's walk too.
+  const form = useMemo(
+    () =>
+      present(
+        jsonSchemaToTree(schema),
+        layered(defaultPresentation, resolvePresentation ?? passthrough)
+      ),
+    [schema, resolvePresentation]
+  )
 
   // Validation issues (submit-time and/or live). Mirrored into the per-path
   // issue store by `ValidationProvider` (ADR 023), so a pass re-renders only the
