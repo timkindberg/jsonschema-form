@@ -1,0 +1,264 @@
+# ADR 030: Container Facts — Generalizing the Neutral Waist so `present()` Can Collapse a Subtree into One Widget
+
+**Date:** 2026-07-02
+**Status:** Proposed (bd `fcj`)
+**Deciders:** Tim Kindberg
+**Extends:** ADR 029 (§1 `FieldFacts` → a node-level `NodeFacts` waist; resolves the
+deferred `valueShape: 'object'` member of §1)
+**Relates to:** ADR 006 (IR waist), ADR 008 (a second implementation earns the seam),
+ADR 010/013 (the continuation `control` facet / render dispatch), ADR 011 (form-state
+shallow slot; submit assembly), ADR 018 (sparse array paths / submit)
+
+## Context
+
+ADR 029 made presentation its own stage: the parser emits neutral **`FieldFacts`** on
+each leaf, and a pure `present()` stage assigns a widget + derives control parts via a
+layered `PresentationResolver`. That resolver is the seam a consumer uses to say "render
+*this* node as *that* widget" for schemas it does not control — the whole point of the
+ADR.
+
+But the seam only reaches **leaves**. Two facts about the code today:
+
+1. **`FieldFacts` is leaf-only.** It lives on `FieldNode` (`nodeTypes.ts`); `present()`
+   calls `presentField` only when `node.isField` and otherwise just recurses into
+   `children` (`present.ts`). `ArrayNode` and `GroupNode` carry **no facts**.
+2. **A resolver therefore cannot opt a *container subtree* into a single widget.** A
+   `PresentationResolver` is `(facts: FieldFacts) => Presentation | undefined` — it is
+   never handed a container, so there is nothing to match on and no node to rewrite.
+
+What this blocks — the canonical case (the VNDLY primary-multiselect pattern):
+
+```jsonc
+// allowed_criteria: choose N criteria objects from a remote list
+{
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": { "name": { "type": "string" }, "type": { "type": "string" } }
+  }
+}
+```
+
+Today this parses to an **`ArrayNode`** (an add/remove list of object sub-forms). The
+product wants a consumer to be able to present it as **one multiselect** producing
+`Array<{ name, type }>` — no schema edit, no add/remove UI. There is no seam for that,
+because the `ArrayNode` has no facts to resolve over.
+
+The mirror gap is object subtrees: a `GroupNode` (e.g. an address, a date-range) that a
+consumer wants to collapse into **one** control that owns the whole `{ … }` value. ADR
+029 §1 anticipated exactly this and **deferred `valueShape: 'object'`** until "such a
+widget earns it," noting it "requires `present()` to collapse a `GroupNode` subtree into
+one widget node — a separate, undesigned capability." **This ADR designs that
+capability** and, with it, earns `valueShape: 'object'`.
+
+## Decision
+
+### 1. `FieldFacts` generalizes to a node-level `NodeFacts` waist
+
+Facts become a property of **every** node — leaves *and* containers — not just leaves.
+Leaves keep exactly today's facts; containers gain facts that describe the value the
+subtree submits. The neutral waist (ADR 006) now spans the whole tree, so the resolver
+can match a container the same way it matches a leaf.
+
+```ts
+type ValueShape = 'scalar' | 'array' | 'object'
+
+interface NodeFacts {
+  path: string
+  label: string
+  description?: string
+  required: boolean
+  valueShape: ValueShape
+  constraints: ValidationRules
+  attrs: { id: string; name: string }
+  origin: { source: string; schema: unknown } // front-end-owned (ADR 029 §2)
+}
+
+// today's FieldFacts, unchanged in meaning
+interface LeafFacts extends NodeFacts {
+  primitive: 'string' | 'number' | 'integer' | 'boolean'
+  format?: string
+  choices?: SelectOption[]
+}
+
+// projected onto ArrayNode / GroupNode
+interface ContainerFacts extends NodeFacts {
+  choices?: SelectOption[]        // present only when the schema constrains a finite set
+  item?: ItemDescriptor           // the neutral shape of one element (open-ended sources)
+}
+```
+
+`ItemDescriptor` is the minimum neutral description of a single element (e.g. its member
+keys + primitives) — enough for a resolver to name a value/label identity **without**
+reading `origin.schema`. Its precise shape is settled by the first two consumers (ADR
+008); it is deliberately thin here.
+
+### 2. `valueShape` is the shape of the *submitted value*, independent of decomposition
+
+This is the load-bearing invariant. `valueShape` describes what the node contributes to
+the submitted document, **whether or not it is currently decomposed into children**:
+
+| node today | `valueShape` | decomposed now? |
+|---|---|---|
+| scalar leaf | `scalar` | — |
+| leaf enum-array (`multiselect`) | `array` | no (already one control) |
+| **subtree array** (`items:object`) | `array` | yes (add/remove) — *collapsible* |
+| **object subtree** (`GroupNode`) | `object` | yes (nested fields) — *collapsible* |
+
+A leaf enum-array and a *collapsed* object-array **both** report `valueShape: 'array'`
+and stay consistent. This resolves ADR 029's deferred member: `'object'` is the
+submitted shape of an object-collapsing widget.
+
+### 3. Generalizing facts to containers is a safe no-op by default
+
+The shipped `defaultPresentation` keys multiselect off **`valueShape === 'array' &&
+choices`** (ADR 029). A subtree array has `valueShape: 'array'` but **no `choices`** (it
+has an `item` descriptor instead), so the default rule yields nothing for it and it
+**stays an add/remove `ArrayNode`**. An object subtree (`valueShape: 'object'`, no
+`choices`) likewise stays decomposed. So projecting facts onto containers changes no
+default output — `present(tree, defaultPresentation)` remains identity-preserving across
+the whole container matrix, exactly as ADR 029's default is for leaves. Conformance
+proves it by folding the default over the existing container schemas.
+
+Collapse happens **only** when a consumer resolver explicitly returns a widget for a
+container node.
+
+### 4. Finite `choices` vs open-ended option **source** — the source is `args`, not facts
+
+Multiselect-over-object-array is richer than the enum case in two ways facts alone
+cannot carry:
+
+- **option source** — the options are usually remote/async (`allowed_criteria` is
+  fetched), so they are *not* a static `choices` array baked into the tree; and
+- **value identity** — each selection is an object `{ name, type }`; the widget needs to
+  know *which* member is the submitted value and *which* is the display label.
+
+Neither belongs in neutral facts. They are supplied by the resolver as **`args`** (the
+generic per-widget config bag from ADR 029 §6, named to avoid colliding with a select's
+`options`):
+
+```ts
+resolvePresentation: (facts) =>
+  facts.path === 'allowed_criteria'
+    ? {
+        widget: 'multiselect',
+        args: { optionsSource: fetchCriteria, valueKey: 'name', labelKey: 'type' },
+      }
+    : undefined
+```
+
+Same widget **name** (`multiselect`), divergent **facts/args** — the exact case `args`
+exists for. Container **facts** carry `valueShape` + *either* `choices` (finite,
+in-schema) *or* an `item` descriptor (open-ended); the resolver supplies the source via
+`args`.
+
+### 5. `present()` gains **collapse**
+
+`present()` today offers only leaves to the resolver. It is generalized to offer
+**container** nodes too, and to *collapse* one when the resolver returns a widget for it:
+
+- prune the subtree's `children`, and
+- emit a single **leaf-like control node** at the container's `path` carrying the
+  container's facts (so `valueShape` is preserved), the resolved `widget`, and `args`.
+
+Uncollapsed containers recurse exactly as today, and identity/structural-sharing is
+preserved (a container whose descendants are unchanged returns itself) so the React
+`NodeRenderer` memo-bail keeps holding (ADR 029 §3).
+
+### 6. Submit assembly stays consistent for free (leaves the array hook where it is)
+
+Submit today collects **`arrayFieldSignatures`** by walking for
+`fieldNode.widget === 'multiselect'`, then `forceArrayFields` wraps a single value into a
+1-element array and `unflatten` nests it (`groupNode.ts` / `groupNode.submitUtils.ts`).
+Because a collapsed object-array is emitted as a **leaf-like node with `valueShape:
+'array'`**, the signature walk keys on **`facts.valueShape === 'array'`** (a trivial
+generalization of the `widget === 'multiselect'` check) and the *array* value assembles
+with no further work — a single selection still submits as `['x']`.
+
+The **object identity** step (mapping the submitted option values back into
+`{ name, type }` objects via `valueKey`/`labelKey`) is an *additional*, resolver-declared
+submit transform. It ships with the async-options capability (§7), not in the first
+slice — the array-shape assembly is correct without it.
+
+### 7. Rendering a collapsed container is gated on ADR 029 §5 (+ async options)
+
+Drawing the collapsed control as DOM needs two things this repo has deliberately not
+built yet:
+
+- the **unified `field.control` slot** (ADR 029 §5) — today React dispatches only
+  `input` vs `select` (`DefaultFieldRoot`), and the engine's `FieldPartRenderers` +
+  Core's `FieldNode` union are closed to `input | select | multiselect`; and
+- an **async/remote options** capability — the current `SelectFieldParts.options` is a
+  static array, which cannot express `optionsSource`.
+
+So **this ADR's scope is the tree-level contract**: the `NodeFacts` waist, container
+facts, `present()` collapse, and submit array-assembly consistency — all fully testable
+without a renderer (assert that `present()` collapses the subtree to one node, prunes its
+children, preserves `valueShape`, and that submit yields the array). The DOM rendering of
+the async object-array multiselect lands with the §5 `control` rewrite (tracked by
+`jsonschema-form-cm7`) and the async-options slot.
+
+## Migration (additive, gate-green per commit)
+
+1. Introduce `NodeFacts` / `LeafFacts` / `ContainerFacts` (`FieldFacts` becomes
+   `LeafFacts`, re-exported under the old name for one release). Project facts onto
+   `ArrayNode` / `GroupNode` in the parser. **No behavior change** — the default rule
+   ignores container facts that lack `choices`.
+2. Generalize `present()` to offer container nodes to the resolver and to collapse when
+   it returns a widget; identity-preserving; default remains a no-op. Fold `present(default)`
+   over the container matrix in conformance to prove the no-op.
+3. Generalize submit's array-signature collection from `widget === 'multiselect'` to
+   `facts.valueShape === 'array'`.
+4. **(Later, with ADR 029 §5 / `cm7`)** render the collapsed control; add the
+   `optionsSource` async slot and the `valueKey`/`labelKey` submit transform.
+
+## Consequences
+
+- **The resolver seam becomes whole-tree.** A consumer can present *any* node — leaf or
+  subtree — as any widget, directly enabling the DB-schema/no-hint story for containers,
+  not just scalars.
+- **`valueShape: 'object'` is earned, not speculative** (ADR 008): it arrives with the
+  object-collapsing widget that needs it, and its exhaustiveness errors will pinpoint
+  every site object-collapse must handle.
+- **Default output is unchanged** — a pure superset; existing trees, conformance, and
+  submit are untouched until a resolver opts in.
+- **`args` carries source + identity, facts stay neutral** — remote/async option sources
+  never pollute the front-end-agnostic waist.
+- **Rendering is explicitly deferred** to the §5 control slot; the facts/collapse/submit
+  contract stands alone and is independently verifiable.
+
+## Explicit rejections
+
+- **Put `optionsSource` / `valueKey` in facts** — rejected; the option source is
+  runtime/remote and consumer-owned, not a neutral, front-end-derivable fact. It is
+  `args` (ADR 029 §6).
+- **A distinct `collapse: true` flag on the resolver return** — rejected; returning a
+  widget for a container *is* the collapse instruction. A container that keeps its widget
+  (`fieldset`/`array`) is simply not collapsed.
+- **Model the collapsed array as a brand-new node kind** — rejected; it is a leaf-like
+  control with `valueShape: 'array'`, so it reuses the existing submit hook and (later)
+  the `multiselect` control. No new kind, no new submit path.
+- **Collapse at parse time** — rejected for the same reason ADR 029 rejected resolving at
+  parse time: it welds the decision to the front-end and blocks override.
+
+## Alternatives considered
+
+- **Leave containers factless; let consumers hijack the render imperatively** (ADR 010
+  `renderNode`) — a consumer *can* already replace an `ArrayNode`'s rendered output, but
+  (a) it must re-implement the widget + its options + submit wiring by hand per app, and
+  (b) the submitted value would still be assembled as an add/remove array unless they
+  also rewrite submit. Collapse in `present()` makes the value shape and the widget a
+  single declarative decision the rest of the pipeline inherits. Rejected as the primary
+  path (imperative hijack remains available for one-offs).
+- **A separate `presentContainer()` resolver distinct from the leaf resolver** —
+  rejected; two resolver seams double the consumer's surface for one concept ("present
+  this node as that widget"). One `NodeFacts`-typed resolver covers both.
+
+---
+
+*This ADR is **proposed**, not accepted: it crosses the stubborn Core facts boundary
+(`FieldFacts` → `NodeFacts`) and adds a capability (`valueShape: 'object'`, subtree
+collapse), so it is escalated for a decision before implementation (AGENTS.md tier 3).
+The accompanying `containerFacts.test.ts` pins today's behavior and records the target
+contract as `it.todo` executable-spec entries so the gate stays green while the design is
+reviewed.*
