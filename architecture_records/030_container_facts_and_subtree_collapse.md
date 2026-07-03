@@ -123,25 +123,39 @@ proves it by folding the default over the existing container schemas.
 Collapse happens **only** when a consumer resolver explicitly returns a widget for a
 container node.
 
-### 4. Finite `choices` vs open-ended option **source** — the source is `args`, not facts
+### 4. Two kinds of option supply: finite `choices` (facts) vs an open-ended **source** (`args`)
 
-Multiselect-over-object-array is richer than the enum case in two ways facts alone
-cannot carry:
+First, separate the easy case. A **finite** option set — whether it comes from `enum`
+*or* `oneOf` — is already carried by neutral `choices`, and `oneOf` already supplies
+**both halves of the identity**: `const` is the submitted value and `title` is the
+display label (this is App_01's pattern, and the parser already lowers it — see
+`arrayNode.ts` / `fieldNode.ts`). So a finite object/enum multiselect needs *nothing*
+extra: `choices: [{ value, label }, …]` is complete, and neither `valueKey` nor
+`labelKey` is involved. This is the common case and it is fully covered by facts today.
 
-- **option source** — the options are usually remote/async (`allowed_criteria` is
-  fetched), so they are *not* a static `choices` array baked into the tree; and
-- **value identity** — each selection is an object `{ name, type }`; the widget needs to
-  know *which* member is the submitted value and *which* is the display label.
+The hard case is **open-ended** options — the VNDLY `allowed_criteria` pattern — which is
+richer than a finite set in two ways facts alone cannot carry:
+
+- **option source** — the options are remote/async (`allowed_criteria` is *fetched*), so
+  there is no static `choices` array to bake into the tree; and
+- **value identity** — each fetched option is an **arbitrary object** (`{ name, type }`
+  is merely VNDLY's shape — it could be any object with any keys), so the widget needs to
+  be told *which* member is the submitted value and *which* is the display label. A
+  finite `oneOf` never has this problem because `const`/`title` are fixed by convention;
+  an arbitrary fetched object has no such convention.
 
 Neither belongs in neutral facts. They are supplied by the resolver as **`args`** (the
 generic per-widget config bag from ADR 029 §6, named to avoid colliding with a select's
-`options`):
+`options`). This is not a new pattern invented here — it is exactly what the VNDLY
+`JSFSelect` already does with its `optionsFromApi` hook, generalized into the resolver:
 
 ```ts
 resolvePresentation: (facts) =>
   facts.path === 'allowed_criteria'
     ? {
         widget: 'multiselect',
+        // optionsSource: () => Promise<Array<Record<string, unknown>>>  (cf. JSFSelect optionsFromApi)
+        // valueKey/labelKey: which member of each fetched object is value vs label
         args: { optionsSource: fetchCriteria, valueKey: 'name', labelKey: 'type' },
       }
     : undefined
@@ -149,8 +163,17 @@ resolvePresentation: (facts) =>
 
 Same widget **name** (`multiselect`), divergent **facts/args** — the exact case `args`
 exists for. Container **facts** carry `valueShape` + *either* `choices` (finite,
-in-schema) *or* an `item` descriptor (open-ended); the resolver supplies the source via
-`args`.
+in-schema, self-identifying) *or* an `item` descriptor (open-ended); the resolver
+supplies the runtime source via `args`.
+
+**Are `valueKey`/`labelKey` canonical or just an example?** — Proposed as *canonical
+typed args for the built-in `multiselect` widget*, not an ad-hoc convention: Core owns
+that widget in the catalog (ADR 029 §6), so it can own the small typed shape
+`{ optionsSource?, valueKey?, labelKey? }` its renderer reads. But they are **not frozen
+by this ADR** — the concrete typing lands with the §5 `control` slot and the async-options
+capability that actually consumes them, and only after a second real consumer confirms the
+shape (ADR 008). Until then they are the *proposed* arg names, exercised by the
+characterization spec, not a shipped public type.
 
 ### 5. `present()` gains **collapse**
 
@@ -161,9 +184,19 @@ in-schema) *or* an `item` descriptor (open-ended); the resolver supplies the sou
 - emit a single **leaf-like control node** at the container's `path` carrying the
   container's facts (so `valueShape` is preserved), the resolved `widget`, and `args`.
 
-Uncollapsed containers recurse exactly as today, and identity/structural-sharing is
-preserved (a container whose descendants are unchanged returns itself) so the React
-`NodeRenderer` memo-bail keeps holding (ADR 029 §3).
+Uncollapsed containers recurse exactly as today. **Collapse is memoized the same way the
+rest of `present()` is** — this is not new machinery, it inherits ADR 029 §3:
+
+- `present()` is a pure fold keyed on `(tree, resolver)`, run **once** and cached upstream
+  (`useSchemaForm`'s `useMemo`), so collapse does **not** re-run on value changes /
+  keystrokes — only if the schema or resolver identity changes.
+- collapse is **identity-preserving**: a container whose facts and resolver decision are
+  unchanged returns the *same* collapsed node reference (structural sharing), so even when
+  `present()` is re-invoked, the collapse body's work is not re-materialized downstream and
+  the React `NodeRenderer` memo-bail keeps holding.
+
+So the collapse code "doesn't run over and over if things aren't different" — same input
+tree + same resolver ⇒ referentially-equal collapsed node, no recompute.
 
 ### 6. Submit assembly stays consistent for free (leaves the array hook where it is)
 
@@ -226,6 +259,17 @@ the async object-array multiselect lands with the §5 `control` rewrite (tracked
   never pollute the front-end-agnostic waist.
 - **Rendering is explicitly deferred** to the §5 control slot; the facts/collapse/submit
   contract stands alone and is independently verifiable.
+- **This sharpens a layer boundary we had left implicit** (surfaced by review): `present()`
+  is the **semantic/structural** stage — it decides the widget, the `valueShape`, and
+  whether a subtree collapses, and *the whole pipeline (crucially submit, which walks the
+  tree) inherits those decisions*. The imperative `renderNode` hijack (ADR 010) is a
+  **presentational** override — it can change how a node *looks* (markup, layout, wrapping
+  DOM) but **cannot** change what the node *submits*, because submit reads the tree, not
+  the rendered output. So the imperative layer is not "less powerful than `present()` by
+  accident" — it is deliberately **visual-only**, and value-shape/structure changes must
+  go through `present()`. This division (declarative semantics vs. imperative visuals) is
+  worth stating as its own principle; if it proves load-bearing beyond this ADR it should
+  graduate to a dedicated ADR amending ADR 010/029.
 
 ## Explicit rejections
 
@@ -246,10 +290,12 @@ the async object-array multiselect lands with the §5 `control` rewrite (tracked
 - **Leave containers factless; let consumers hijack the render imperatively** (ADR 010
   `renderNode`) — a consumer *can* already replace an `ArrayNode`'s rendered output, but
   (a) it must re-implement the widget + its options + submit wiring by hand per app, and
-  (b) the submitted value would still be assembled as an add/remove array unless they
-  also rewrite submit. Collapse in `present()` makes the value shape and the widget a
-  single declarative decision the rest of the pipeline inherits. Rejected as the primary
-  path (imperative hijack remains available for one-offs).
+  (b) the submitted value would **still** be assembled as an add/remove array, because
+  submit walks the **tree**, not the rendered DOM — imperative hijack cannot change what a
+  node submits. This is not a wart to route around; it surfaces a real layer boundary
+  (see the new consequence below). Collapse in `present()` makes the value shape and the
+  widget a single declarative decision the rest of the pipeline inherits. Rejected as the
+  primary path (imperative hijack remains available for one-off *visual* overrides).
 - **A separate `presentContainer()` resolver distinct from the leaf resolver** —
   rejected; two resolver seams double the consumer's surface for one concept ("present
   this node as that widget"). One `NodeFacts`-typed resolver covers both.

@@ -46,6 +46,29 @@ const enumArraySchema = {
   },
 } as const
 
+// A leaf oneOf-array — the same multiselect shape, but each option carries a
+// DISTINCT value (const) and label (title). This is the App_01 pattern the ADR
+// calls out: a finite `choices` set that already supplies value+label identity,
+// so it needs NO args.valueKey/labelKey (contrast §4's open-ended object source).
+// (A *deep* oneOf — object variants with no `const` — is the separate aml bug,
+// out of scope here.)
+const oneOfArraySchema = {
+  type: 'object',
+  properties: {
+    permissions: {
+      type: 'array',
+      title: 'Permissions',
+      items: {
+        oneOf: [
+          { const: 'read', title: 'Can read' },
+          { const: 'write', title: 'Can write' },
+          { const: 'admin', title: 'Administrator' },
+        ],
+      },
+    },
+  },
+} as const
+
 describe('container facts / subtree collapse — CURRENT behavior (ADR 030 gap)', () => {
   it('a subtree object-array is an ArrayNode with NO facts (facts are leaf-only)', () => {
     const tree = jsonSchemaToTree(objectArraySchema)
@@ -61,6 +84,21 @@ describe('container facts / subtree collapse — CURRENT behavior (ADR 030 gap)'
     expect(tags?.widget).toBe('multiselect')
     expect(tags?.facts.valueShape).toBe('array')
     expect(tags?.facts.choices?.map((o) => o.value)).toEqual(['a', 'b', 'c'])
+  })
+
+  it('a leaf oneOf-array carries the SAME facts shape, but choices carry value+label', () => {
+    // Same multiselect / valueShape:"array" as the enum case — the ADR's point is
+    // that a finite oneOf ALREADY supplies both the submitted value (const) and the
+    // display label (title), so identity is known WITHOUT args.valueKey/labelKey.
+    const tree = jsonSchemaToTree(oneOfArraySchema)
+    const permissions = tree.getField('permissions')
+    expect(permissions?.widget).toBe('multiselect')
+    expect(permissions?.facts.valueShape).toBe('array')
+    expect(permissions?.facts.choices).toEqual([
+      { value: 'read', label: 'Can read' },
+      { value: 'write', label: 'Can write' },
+      { value: 'admin', label: 'Administrator' },
+    ])
   })
 
   it('a resolver CANNOT collapse a container today — present() never offers it the container', () => {
