@@ -20,6 +20,14 @@ const schema: JSONSchema = {
       ],
       title: 'Country',
     },
+    // A small array-enum → checkbox group (the multi-select choicegroup), so this
+    // demo shows both sides of the archetype: `country` (radio) + `interests`.
+    interests: {
+      type: 'array',
+      title: 'Interests',
+      description: 'Select all that apply',
+      items: { enum: ['sports', 'music', 'tech', 'art'] },
+    },
     subscribe: {
       type: 'boolean',
       title: 'Subscribe to newsletter',
@@ -69,7 +77,9 @@ function App() {
           if (node.nodeType === 'field') {
             return (
               <div key={node.path}>
-                <label htmlFor={node.path}>
+                {/* Use the derived `for` (not node.path): a choicegroup points it at
+                    its first option, since the group has no single element id. */}
+                <label htmlFor={node.parts.label.attrs.for}>
                   {node.parts.label.text}
                   {node.validation.required && <span> *</span>}
                 </label>
@@ -112,7 +122,7 @@ function App() {
                   if (childNode.nodeType === 'field') {
                     return (
                       <div key={childNode.path}>
-                        <label htmlFor={childNode.path}>
+                        <label htmlFor={childNode.parts.label.attrs.for}>
                           {childNode.parts.label.text}
                           {childNode.validation.required && <span> *</span>}
                         </label>

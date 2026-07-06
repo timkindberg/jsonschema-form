@@ -140,6 +140,14 @@ function present(
   a `checkboxes` group ≡ a `multiselect` (a `string[]`) — so the heuristic is a
   pure *presentation* swap: it never changes what the schema validates or submit
   assembles, and every choice stays overridable by a consumer resolver.
+
+  The count is read from the **schema** (`enum`/`oneOf` length) at present() time —
+  a *compile-time* default, not a reactive per-render decision. It keys off the
+  static `facts.choices`, never live form values, so a widget cannot flip from
+  `radio` to `select` while the user is filling the form. Runtime/async option sets
+  (e.g. fetched from an API) are not modelled by Core today; a consumer supplying
+  them owns the widget decision and should **pin it via a resolver**
+  (`{ widget: 'select' }`) so a later count change can't re-pick the archetype.
 - It runs **once per schema/resolver change**, memoized alongside parse, and **must
   preserve node identity for unchanged subtrees** (structural sharing) so the
   React `NodeRenderer` memo-bail keeps holding.

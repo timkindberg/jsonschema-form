@@ -105,8 +105,19 @@ export interface ChoiceOption {
   label: string
 }
 
-// The resolved widget *name* (ADR 029 §6, amended by bd v60/cm7). It is a label,
-// not a parts discriminant — it widens to `string & Brand` when custom widgets land.
+// The resolved widget *name* (ADR 029 §6, amended by bd v60/cm7): the catalog
+// identity a resolver picks and consumers read for intent. It is a label, not a
+// parts discriminant, and widens to `string & Brand` when custom widgets land.
+//
+// Widget name and `control.kind` (below) are two axes, mapped MANY-name → ONE-kind:
+//   input                 → kind 'input'
+//   select | multiselect  → kind 'select'      (multiselect = + attrs.multiple)
+//   radio  | checkboxes   → kind 'choicegroup' (checkboxes  = + multiple)
+//   textarea              → kind 'textarea'
+// The name carries fine-grained identity/intent; the kind is the closed, tiny set
+// of *render archetypes* an adapter must handle. That decoupling is the whole point
+// of ADR 029 §5/§6: the widget catalog can grow without growing adapter branches —
+// `multiselect` and `checkboxes` were added as (kind + a flag), not new adapter code.
 export type WidgetName =
   | 'input'
   | 'select'
@@ -116,13 +127,16 @@ export type WidgetName =
   | 'checkboxes'
 
 /**
- * The unified control facet (ADR 029 §5). A single `control` part replaces the old
- * per-widget `input`/`select` parts. It is discriminated on `kind` — the render
- * **archetype** (which element to draw) — decoupled from `node.widget` (the resolved
- * name): `multiselect` is `kind: 'select'` + `attrs.multiple`; `radio` and
- * `checkboxes` are both `kind: 'choicegroup'`, distinguished by `multiple` (bd cm7).
- * The adapter narrows on `kind`; the engine and node structure never enumerate
- * widgets. A generic/`raw` archetype for custom widgets is deferred (ADR 008).
+ * The unified control facet (ADR 029 §5) — a single `control` part, discriminated
+ * on `kind`, the render **archetype**: literally *which DOM shape to draw*. This is
+ * why `select` and `choicegroup` are distinct kinds rather than one "choice" kind,
+ * even though both consume `facts.choices`: a `select` is ONE `<select>` element
+ * with `<option>` children (one focusable control), while a `choicegroup` is N
+ * separate `<input type=radio|checkbox>` elements (each independently focusable) in
+ * a labelled wrapper. Same neutral data, fundamentally different markup — so the
+ * adapter needs different branches. The shared "all choice widgets" representation
+ * lives upstream as `facts.choices`, not here. A generic/`raw` archetype for custom
+ * widgets is deferred (ADR 008).
  */
 export type FieldControl =
   | { kind: 'input'; attrs: HtmlInputAttrs }
