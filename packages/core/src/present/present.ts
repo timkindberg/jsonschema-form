@@ -232,8 +232,11 @@ export function deriveFieldParts(
   if (!control) return undefined
   const parts: FieldParts = { ...commonParts(f), control }
   // A choicegroup has no single element with the field id, so the caption
-  // `<label for>` would dangle. Point it at the first option (a valid, focusable
-  // target) so clicking the caption focuses the group's first control.
+  // `<label for>` would dangle. Point it at the first option so the caption is
+  // programmatically associated. This is a pragmatic compromise, NOT the canonical
+  // pattern: the textbook grouping a11y is fieldset+legend or role=radiogroup +
+  // aria-labelledby, and label-for-first-option has the side effect of selecting
+  // that option on caption click. Upgrading to aria-labelledby is bd l8j.
   if (control.kind === 'choicegroup' && control.options.length > 0) {
     parts.label = { ...parts.label, attrs: { for: control.options[0].attrs.id } }
   }
