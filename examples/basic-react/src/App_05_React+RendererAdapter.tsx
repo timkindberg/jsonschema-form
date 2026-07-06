@@ -44,12 +44,13 @@ const FieldsInput = createRenderer({
 // `control` renderer narrows on `control.kind` to cover every archetype.
 const FieldsMost = createRenderer({
   field: {
-    label: ({ text, attrs, showRequired }) => (
-      <label htmlFor={attrs.for}>
-        {text}
-        {showRequired && <span aria-hidden> *</span>}
-      </label>
-    ),
+        label: ({ text, attrs, showRequired }) => (
+          // Neutral caption attrs: spread the `id`, rename `for`→`htmlFor` (bd l8j).
+          <label id={attrs.id} htmlFor={attrs.for}>
+            {text}
+            {showRequired && <span aria-hidden> *</span>}
+          </label>
+        ),
     control: (control) => {
       switch (control.kind) {
         case 'input':
@@ -69,7 +70,7 @@ const FieldsMost = createRenderer({
           )
         case 'choicegroup':
           return (
-            <div role={control.multiple ? 'group' : 'radiogroup'}>
+            <div role={control.role} aria-labelledby={control.labelledBy}>
               {control.options.map((o) => (
                 <label key={o.attrs.id}>
                   <input {...o.attrs} /> {o.label}

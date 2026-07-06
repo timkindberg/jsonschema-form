@@ -218,10 +218,37 @@ wrapped in a `role={radiogroup|group}` container — so the per-option `<input>`
 derived **in Core** (`choiceOptions(facts)`), keeping React ≡ vanilla. Two seam
 consequences confirmed the design generalizes: (a) the group's error a11y sits on the
 **wrapper**, not each input, still applied once from the field root's context; and (b)
-`deriveFieldParts` retargets the caption `<label for>` at the first option (a group has
-no single element bearing the field id). Submit needed no widget special-casing —
-array-wrapping was re-keyed off `facts.valueShape === 'array'` (§ below), which already
-covered `multiselect` and now `checkboxes` for free.
+the caption/group are wired by the canonical **`role` + `aria-labelledby`** grouping
+pattern (see the `l8j` note below).
+
+**Amended (bd `l8j`, 2026-07-05) — group naming + role live in Core.** `cm7` first
+retargeted the caption `<label for>` at the first option (a group has no single element
+bearing the field id) — but `for` *activates* its target, so clicking the caption
+selected the first radio. Replaced with the standard pattern, fully derived in Core so
+every adapter is byte-identical: the `choicegroup` control carries `role`
+(`'radiogroup'` for single-choice, `'group'` for multi — there is no `checkboxgroup`
+role) and `labelledBy` (the caption's `id`). The wrapper renders `role={control.role}
+aria-labelledby={control.labelledBy}`. This removes the `node.parts.control.multiple ?
+'group' : 'radiogroup'` ternary that had leaked into every adapter and example.
+
+**Refined (bd `l8j` follow-up, PR #36 review) — the caption `attrs` are one spreadable
+bag.** The first cut modeled `FieldPartsBase.label.attrs` as a closed either/or
+`{ for } | { id }`, which just moved the discrimination onto every consumer
+(`'for' in attrs ? …`) — trading one ternary for another. Collapsed to a single
+always-spreadable shape `{ id: string; for?: string }`: *every* caption carries an `id`
+(so it can always be an `aria-labelledby` target), and a single-control caption *also*
+points `for` at its control; a `choicegroup` simply omits `for` (its `id` === the
+wrapper's `labelledBy`). Consumers now spread the bag; the only adapter step is one
+neutral→framework rename (`for`→`htmlFor` in React), never a per-part branch. This is
+the first slice of a broader "every part exposes a spreadable neutral `attrs` bag +
+one adapter-level translator" principle (bd `tj0`).
+
+Submit needed no widget special-casing at compile time — array-wrapping keys off array
+shape at assembly (§ below). (A later hotfix first widened that key to the
+`multiselect`/`checkboxes` widget *names* — since a resolver can force an array-valued
+control onto a scalar-shaped field — then refined it to read multiplicity off the typed
+control archetype (`control.kind` + `multiple`), keeping submit decoupled from
+presentation vocabulary.)
 
 ### 6. Typing: closed Core archetype union, branded custom widgets
 

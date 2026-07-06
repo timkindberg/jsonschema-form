@@ -103,11 +103,15 @@ function DefaultFieldLabel({
   showRequired,
 }: {
   text: string
-  attrs: { for: string }
+  attrs: { id: string; for?: string }
   showRequired: boolean
 }): ReactNode {
+  // Neutral HTML attrs → React props: the only rename is `for`→`htmlFor`. Every
+  // caption has an `id`; `for` is present only when it points at a single
+  // control (omitted for a choicegroup, so `htmlFor={undefined}` drops out).
+  const { for: htmlFor, ...rest } = attrs
   return (
-    <label htmlFor={attrs.for}>
+    <label {...rest} htmlFor={htmlFor}>
       {text}
       {showRequired && <span aria-hidden> *</span>}
     </label>
@@ -157,13 +161,18 @@ function DefaultControl(control: FieldControl): ReactNode {
     }
     case 'choicegroup': {
       // Radio (single) or checkbox (multi) group — a set of native option inputs,
-      // each implicitly labelled by its wrapping `<label>` (bd cm7). The group's
-      // a11y (role + error wiring) sits on the wrapper; each option is uncontrolled
-      // with a `value` attr (radio/checkbox use `checked`, not `value`, for state,
-      // so no controlled-input warning). `role` reflects single- vs multi-choice.
-      const role = control.multiple ? 'group' : 'radiogroup'
+      // each implicitly labelled by its wrapping `<label>` (bd cm7). Group a11y is
+      // Core-derived (bd l8j): `control.role` (radiogroup|group) and
+      // `aria-labelledby={control.labelledBy}` naming the group by its caption id —
+      // no adapter recomputes the role. Each option is uncontrolled with a `value`
+      // attr (radio/checkbox use `checked`, not `value`, so no controlled warning).
       return (
-        <div className="jsf-choicegroup" role={role} {...a11yProps}>
+        <div
+          className="jsf-choicegroup"
+          role={control.role}
+          aria-labelledby={control.labelledBy}
+          {...a11yProps}
+        >
           {control.options.map((o) => (
             <label key={o.attrs.id} className="jsf-choice">
               <input {...o.attrs} />

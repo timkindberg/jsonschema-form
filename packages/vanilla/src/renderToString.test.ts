@@ -38,7 +38,7 @@ describe('renderToString — default rendering', () => {
   })
 
   it('emits labels wired to inputs by id/for', () => {
-    expect(html).toContain('<label for="name">Name')
+    expect(html).toContain('<label id="name-label" for="name">Name')
     expect(html).toContain('id="name"')
     expect(html).toContain('name="name"')
   })
@@ -71,7 +71,7 @@ describe('renderToString — default rendering', () => {
     const out = renderToString(nameless)
     expect(out).toContain('<div class="jsf-group">')
     expect(out).not.toContain('<fieldset')
-    expect(out).toContain('<label for="meta.note">Note')
+    expect(out).toContain('<label id="meta.note-label" for="meta.note">Note')
   })
 
   it('marks required fields with an asterisk', () => {
@@ -105,7 +105,7 @@ describe('renderToString — continuation model', () => {
     expect(html).toContain('<div class="hand">')
     // input rendered before label (custom order)
     expect(html.indexOf('id="name"')).toBeLessThan(
-      html.indexOf('<label for="name">')
+      html.indexOf('<label id="name-label" for="name">')
     )
   })
 
@@ -117,7 +117,9 @@ describe('renderToString — continuation model', () => {
           : node.Default(),
     })
     expect(html).toContain('<section class="addr">')
-    expect(html).toContain('<label for="address.street">Street')
+    expect(html).toContain(
+      '<label id="address.street-label" for="address.street">Street'
+    )
   })
 
   it('node.Default({ renderNode }) scopes a resolver to that subtree only', () => {
@@ -137,7 +139,7 @@ describe('renderToString — continuation model', () => {
     // the scoped override fires inside address…
     expect(html).toContain('<p>scoped-street</p>')
     // …but the top-level name field is untouched by the scoped resolver
-    expect(html).toContain('<label for="name">Name')
+    expect(html).toContain('<label id="name-label" for="name">Name')
   })
 })
 

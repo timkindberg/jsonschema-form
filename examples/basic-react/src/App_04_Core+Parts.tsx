@@ -71,7 +71,9 @@ function App() {
 
             return (
               <div key={container.key} style={{ marginBottom: '1rem' }}>
-                <label htmlFor={label.attrs.for}>
+                {/* Neutral caption attrs: spread the `id`, rename `for`→`htmlFor`
+                    (`for` absent for a choicegroup) — bd l8j. */}
+                <label id={label.attrs.id} htmlFor={label.attrs.for}>
                   {label.text}
                   {label.showRequired && <span> *</span>}
                 </label>
@@ -102,7 +104,8 @@ function App() {
                   />
                 ) : node.parts.control.kind === 'choicegroup' ? (
                   <div
-                    role={node.parts.control.multiple ? 'group' : 'radiogroup'}
+                    role={node.parts.control.role}
+                    aria-labelledby={node.parts.control.labelledBy}
                     style={{ display: 'block', marginTop: '0.25rem' }}
                   >
                     {node.parts.control.options.map((opt) => (

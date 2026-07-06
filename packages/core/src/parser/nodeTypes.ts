@@ -142,13 +142,43 @@ export type FieldControl =
   | { kind: 'input'; attrs: HtmlInputAttrs }
   | { kind: 'select'; attrs: HtmlSelectAttrs; options: SelectOption[] }
   | { kind: 'textarea'; attrs: HtmlTextareaAttrs }
-  | { kind: 'choicegroup'; multiple: boolean; options: ChoiceOption[] }
+  | {
+      kind: 'choicegroup'
+      multiple: boolean
+      /**
+       * Group a11y, derived in Core so every adapter is identical and no adapter
+       * recomputes it (bd l8j). `role` is the ARIA grouping role — `radiogroup`
+       * for a single-choice radio set, `group` for a multi-choice checkbox set
+       * (there is no `checkboxgroup` role). `labelledBy` is the id of this field's
+       * caption `<label>` (see `FieldPartsBase.label`); the wrapper carries
+       * `aria-labelledby={labelledBy}`, which names the group WITHOUT the
+       * label-for-first-option hack (that hack, from cm7, activated the first
+       * option on caption click). Together they are the canonical
+       * role + aria-labelledby grouping pattern.
+       */
+      role: 'radiogroup' | 'group'
+      labelledBy: string
+      options: ChoiceOption[]
+    }
 
 export type ControlKind = FieldControl['kind']
 
 export interface FieldPartsBase {
   container: { key: string }
-  label: { text: string; attrs: { for: string }; showRequired: boolean }
+  /**
+   * The caption's DOM attributes as ONE spreadable bag (neutral HTML names —
+   * adapters rename `for`→`htmlFor` etc. in a single place, never per-part).
+   * Every caption carries an `id` so it can always be an `aria-labelledby`
+   * target; a field with a single control additionally points `for` at that
+   * control (click-to-focus). A `choicegroup` has no single control, so it omits
+   * `for` and the group wrapper names itself via `aria-labelledby`
+   * (= `control.labelledBy`, which equals this `id`) — bd l8j.
+   */
+  label: {
+    text: string
+    attrs: { id: string; for?: string }
+    showRequired: boolean
+  }
   description?: { text: string }
 }
 
