@@ -166,15 +166,17 @@ export type ControlKind = FieldControl['kind']
 export interface FieldPartsBase {
   container: { key: string }
   /**
-   * The caption. Its `attrs` are a closed either/or: a field with ONE control
-   * points its caption AT that control (`for` = the control id, so a click
-   * focuses it); a `choicegroup` has no single control, so instead its caption
-   * is a labelling *target* (`id`) that the group wrapper references via
-   * `aria-labelledby` (= `control.labelledBy`) — bd l8j.
+   * The caption's DOM attributes as ONE spreadable bag (neutral HTML names —
+   * adapters rename `for`→`htmlFor` etc. in a single place, never per-part).
+   * Every caption carries an `id` so it can always be an `aria-labelledby`
+   * target; a field with a single control additionally points `for` at that
+   * control (click-to-focus). A `choicegroup` has no single control, so it omits
+   * `for` and the group wrapper names itself via `aria-labelledby`
+   * (= `control.labelledBy`, which equals this `id`) — bd l8j.
    */
   label: {
     text: string
-    attrs: { for: string } | { id: string }
+    attrs: { id: string; for?: string }
     showRequired: boolean
   }
   description?: { text: string }

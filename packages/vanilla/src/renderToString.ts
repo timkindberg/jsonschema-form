@@ -105,7 +105,7 @@ const defaultAdapterImpl: VanillaAdapter = {
       showRequired,
     }: {
       text: string
-      attrs: { for: string } | { id: string }
+      attrs: { id: string; for?: string }
       showRequired: boolean
     }) {
       const req = showRequired ? '<span aria-hidden="true"> *</span>' : ''

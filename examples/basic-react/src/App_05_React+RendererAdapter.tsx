@@ -44,14 +44,13 @@ const FieldsInput = createRenderer({
 // `control` renderer narrows on `control.kind` to cover every archetype.
 const FieldsMost = createRenderer({
   field: {
-    label: ({ text, attrs, showRequired }) => (
-      // Single-control caption points AT its control (`htmlFor`); a choicegroup
-      // caption is a labelling target (`id`) named by the group's aria-labelledby.
-      <label {...('for' in attrs ? { htmlFor: attrs.for } : { id: attrs.id })}>
-        {text}
-        {showRequired && <span aria-hidden> *</span>}
-      </label>
-    ),
+        label: ({ text, attrs, showRequired }) => (
+          // Neutral caption attrs: spread the `id`, rename `for`→`htmlFor` (bd l8j).
+          <label id={attrs.id} htmlFor={attrs.for}>
+            {text}
+            {showRequired && <span aria-hidden> *</span>}
+          </label>
+        ),
     control: (control) => {
       switch (control.kind) {
         case 'input':

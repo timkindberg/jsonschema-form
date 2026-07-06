@@ -100,7 +100,10 @@ function commonParts(f: FieldFacts) {
     container: { key: f.path },
     label: {
       text: f.label,
-      attrs: { for: f.attrs.id },
+      // Every caption gets an `id` (so it can always be an aria-labelledby
+      // target) and points `for` at its control. A choicegroup — which has no
+      // single control — drops `for` in deriveFieldParts (id === labelledBy).
+      attrs: { id: captionId(f), for: f.attrs.id },
       showRequired: f.required,
     },
   }
@@ -250,11 +253,11 @@ export function deriveFieldParts(
   const control = deriveControl(f, widget)
   if (!control) return undefined
   const parts: FieldParts = { ...commonParts(f), control }
-  // A choicegroup has no single control for the caption `<label for>` to target.
-  // Rather than the cm7 hack (point `for` at the first option — which selected
-  // that option on caption click), give the caption an `id` and let the group
-  // wrapper name itself with `aria-labelledby={control.labelledBy}` (bd l8j — the
-  // canonical role + aria-labelledby grouping pattern; both ids are one value).
+  // A choicegroup has no single control for `for` to target, so drop it: the
+  // caption is id-only and the group wrapper names itself via
+  // `aria-labelledby={control.labelledBy}` (= this id). Single-control captions
+  // keep the `for` from commonParts. (Supersedes the cm7 hack of pointing `for`
+  // at the first option, which selected it on caption click — bd l8j.)
   if (control.kind === 'choicegroup') {
     parts.label = { ...parts.label, attrs: { id: control.labelledBy } }
   }

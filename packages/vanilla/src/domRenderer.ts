@@ -150,7 +150,7 @@ const defaultAdapterImpl: DomAdapter = {
       showRequired,
     }: {
       text: string
-      attrs: { for: string } | { id: string }
+      attrs: { id: string; for?: string }
       showRequired: boolean
     }) {
       const label = createEl('label', attrs, text)

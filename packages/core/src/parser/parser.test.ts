@@ -622,6 +622,7 @@ describe('jsonSchemaToTree', () => {
         expect(field?.parts.label).toEqual({
           text: 'Full Name',
           attrs: {
+            id: 'name-label',
             for: 'name',
           },
           showRequired: true,
@@ -1171,6 +1172,7 @@ describe('jsonSchemaToTree', () => {
       expect(field?.parts.label).toEqual({
         text: 'Enable Notifications',
         attrs: {
+          id: 'notifications-label',
           for: 'notifications',
         },
         showRequired: true,

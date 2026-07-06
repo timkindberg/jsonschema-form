@@ -77,13 +77,12 @@ function App() {
           if (node.nodeType === 'field') {
             return (
               <div key={node.path}>
-                {/* A single-control caption points AT its control (`for`); a
-                    choicegroup caption is a labelling target (`id`) named by the
-                    group's aria-labelledby (bd l8j) — both derived in Core. */}
+                {/* Neutral caption attrs, just spread: every caption has an `id`;
+                    `for` is present only for a single control, absent for a
+                    choicegroup (bd l8j). React's one rename is `for`→`htmlFor`. */}
                 <label
-                  {...('for' in node.parts.label.attrs
-                    ? { htmlFor: node.parts.label.attrs.for }
-                    : { id: node.parts.label.attrs.id })}
+                  id={node.parts.label.attrs.id}
+                  htmlFor={node.parts.label.attrs.for}
                 >
                   {node.parts.label.text}
                   {node.validation.required && <span> *</span>}
@@ -131,9 +130,8 @@ function App() {
                     return (
                       <div key={childNode.path}>
                         <label
-                          {...('for' in childNode.parts.label.attrs
-                            ? { htmlFor: childNode.parts.label.attrs.for }
-                            : { id: childNode.parts.label.attrs.id })}
+                          id={childNode.parts.label.attrs.id}
+                          htmlFor={childNode.parts.label.attrs.for}
                         >
                           {childNode.parts.label.text}
                           {childNode.validation.required && <span> *</span>}

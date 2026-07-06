@@ -103,15 +103,15 @@ function DefaultFieldLabel({
   showRequired,
 }: {
   text: string
-  attrs: { for: string } | { id: string }
+  attrs: { id: string; for?: string }
   showRequired: boolean
 }): ReactNode {
-  // A single-control caption points AT its control (`htmlFor`); a choicegroup
-  // caption is a labelling target (`id`) referenced by the group's
-  // `aria-labelledby` (bd l8j). Same `<label>`, one of two anchoring attrs.
-  const anchor = 'for' in attrs ? { htmlFor: attrs.for } : { id: attrs.id }
+  // Neutral HTML attrs → React props: the only rename is `for`→`htmlFor`. Every
+  // caption has an `id`; `for` is present only when it points at a single
+  // control (omitted for a choicegroup, so `htmlFor={undefined}` drops out).
+  const { for: htmlFor, ...rest } = attrs
   return (
-    <label {...anchor}>
+    <label {...rest} htmlFor={htmlFor}>
       {text}
       {showRequired && <span aria-hidden> *</span>}
     </label>

@@ -71,13 +71,9 @@ function App() {
 
             return (
               <div key={container.key} style={{ marginBottom: '1rem' }}>
-                {/* Single-control caption points AT its control (`for`); a
-                    choicegroup caption is a labelling target (`id`) — bd l8j. */}
-                <label
-                  {...('for' in label.attrs
-                    ? { htmlFor: label.attrs.for }
-                    : { id: label.attrs.id })}
-                >
+                {/* Neutral caption attrs: spread the `id`, rename `for`→`htmlFor`
+                    (`for` absent for a choicegroup) — bd l8j. */}
+                <label id={label.attrs.id} htmlFor={label.attrs.for}>
                   {label.text}
                   {label.showRequired && <span> *</span>}
                 </label>
