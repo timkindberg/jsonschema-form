@@ -72,14 +72,14 @@ export interface ContainerFacts extends NodeFacts {
 
 /**
  * The minimum neutral description of one array element (ADR 030 §1). Deliberately
- * thin — its precise shape is settled by real consumers (ADR 008). Object items
- * expose their member `keys` so a resolver can name value/label identity WITHOUT
- * reading `origin.schema`.
+ * thin — its precise shape is settled by real consumers (ADR 008). Discriminated
+ * on `valueShape`: an OBJECT item exposes its member `keys` (guaranteed present, so
+ * a resolver narrows on `valueShape === 'object'` to name value/label identity
+ * WITHOUT reading `origin.schema`); scalar/array items have no member keys.
  */
-export interface ItemDescriptor {
-  valueShape: ValueShape
-  keys?: string[]
-}
+export type ItemDescriptor =
+  | { valueShape: 'object'; keys: string[] }
+  | { valueShape: 'scalar' | 'array'; keys?: never }
 
 /**
  * Any node's facts — the type a `PresentationResolver` receives (ADR 030 §5). The

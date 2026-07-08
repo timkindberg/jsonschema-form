@@ -46,9 +46,19 @@ export interface Presentation {
  *
  * Receives {@link AnyFacts} (the `LeafFacts | ContainerFacts` union) so a resolver
  * can read `choices` on either; `primitive` (leaf) and `item` (container) are
- * reached by narrowing (`'primitive' in facts`).
+ * reached by narrowing with {@link isContainerFacts}.
  */
 export type PresentationResolver = (facts: AnyFacts) => Presentation | undefined
+
+/**
+ * Leaf-vs-container discriminant for {@link AnyFacts}: a leaf carries a
+ * `primitive`, a container never does. The one place that structural distinction
+ * is encoded, so callers (and resolvers) read `isContainerFacts(f)` instead of
+ * hand-rolling the `'primitive' in f` check.
+ */
+export function isContainerFacts(f: AnyFacts): f is ContainerFacts {
+  return !('primitive' in f)
+}
 
 /**
  * The option-count threshold (bd cm7). At or below it, a constrained field
@@ -83,14 +93,12 @@ export const defaultPresentation: PresentationResolver = (f) => {
       : { widget: 'select' }
   }
   // Containers are never collapsed by default (ADR 030 §3): only a leaf gets the
-  // plain-input fallback. A container has no `primitive`, so returning `undefined`
-  // for it leaves the subtree decomposed unless a consumer resolver opts in.
-  // (§3 amendment — collapsing scalar-choice ARRAYS by default — is deferred to PR
-  // B2: the parser still collapses those to a leaf today, so they arrive here as a
-  // `valueShape:'array' && choices` leaf and hit the first branch above. The
-  // `node.validation` field this once collided with is gone — `facts.constraints`
-  // is the single validation home, ADR 033 §1.)
-  if (!('primitive' in f)) return undefined
+  // plain-input fallback, so returning `undefined` for a container leaves the
+  // subtree decomposed unless a consumer resolver opts in. (The §3 amendment —
+  // collapsing scalar-choice ARRAYS by default — is tracked in bd 8o0: those still
+  // collapse to a leaf upstream today, so they arrive here as a
+  // `valueShape:'array' && choices` leaf and hit the first branch above.)
+  if (isContainerFacts(f)) return undefined
   return { widget: 'input' }
 }
 

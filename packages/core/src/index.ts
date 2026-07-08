@@ -60,6 +60,7 @@ export {
   layered,
   deriveControl,
   deriveFieldParts,
+  isContainerFacts,
 } from './present/present'
 export type { Presentation, PresentationResolver } from './present/present'
 
