@@ -3,13 +3,16 @@
 // The tree-level contract: neutral facts are projected onto CONTAINER nodes
 // (ArrayNode/GroupNode), and `present()` offers a container to the resolver and
 // COLLAPSES its subtree into one leaf-like node when the resolver returns a widget.
-// The default rule is a no-op for containers (object arrays stay add/remove; groups
-// stay decomposed) — only a consumer resolver opts a container in. Rendering the
-// collapsed control + its async object source (ADR 030 §4/§7) needs the
-// async-options slot and is tracked separately (see the `it.todo`s below).
+// The default rule collapses ONLY a self-identifying scalar-choice array (finite
+// enum/oneOf items → one multiselect/checkboxes leaf, ADR 030 §3); an open-ended
+// object array stays add/remove and a group stays decomposed unless a consumer
+// resolver opts it in. Rendering the collapsed object-array control + its async
+// source (ADR 030 §4/§7) needs the async-options slot, tracked separately (the
+// `it.todo` below).
 
 import { describe, it, expect } from 'vitest'
 import { jsonSchemaToTree } from '../parser/index'
+import { createGroupNode } from '../parser/groupNode'
 import {
   assertArrayNode,
   assertField,
@@ -300,14 +303,30 @@ describe('default present() leaves containers decomposed (ADR 030 §3)', () => {
   })
 })
 
+describe('scalar-choice-array collapse lives in present() (ADR 030 §3 / ADR 033 §2)', () => {
+  it('the front-end emits an un-collapsed ArrayNode with choices; present() folds it to a leaf', () => {
+    // The front-end (createGroupNode, pre-present) is a pure STRUCTURAL transcriber:
+    // a scalar-choice array is an ArrayNode carrying `choices`, NOT a collapsed
+    // leaf. The collapse is present()'s job, so the lowering decision lives in one
+    // place and every front-end inherits it (ADR 033 §2).
+    const raw = createGroupNode('', enumArraySchema, false)
+    const rawTags = raw.children.find((c) => c.path === 'tags')
+    assertArrayNode(rawTags)
+    expect(rawTags.facts.choices?.map((o) => o.value)).toEqual(['a', 'b', 'c'])
+    expect(rawTags.facts.item).toBeUndefined() // choices XOR item
+
+    // present()'s default rule collapses that container into one choice leaf.
+    const tags = present(raw, defaultPresentation).getField('tags')
+    assertField(tags)
+    expect(tags.widget).toBe('checkboxes')
+    expect(tags.facts.valueShape).toBe('array')
+    expect(tags.facts.choices?.map((o) => o.value)).toEqual(['a', 'b', 'c'])
+  })
+})
+
 describe('container facts / subtree collapse — deferred (ADR 030)', () => {
   // §7 — rendering the collapsed control needs the async-options slot (bd cm7/v60).
   it.todo(
     'renders the collapsed object-array multiselect via the field.control slot + async options — §7'
-  )
-  // §3 amendment — the scalar-choice-array collapse moves from the front-end into
-  // present() as a default (bd 8o0), so front-ends stay pure structural transcribers.
-  it.todo(
-    'default present() collapses scalar-choice arrays (structural array → leaf) — §3 amendment'
   )
 })

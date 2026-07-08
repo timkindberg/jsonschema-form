@@ -1,7 +1,7 @@
 # ADR 033: Core Is Schema-Agnostic — a Neutral Compile-In Seam and Per-Schema Input Packages
 
 **Date:** 2026-07-07
-**Status:** Accepted (bd `8o0`) — staged implementation (B1 → B2 → B3)
+**Status:** Accepted (bd `8o0`) — staged implementation (B1 ✅ → B2 ✅ → B3 pending)
 **Deciders:** Tim Kindberg
 **Extends:** ADR 006 (Core as the form-tree IR with adapters), ADR 029 (neutral
 `FieldFacts` + `present()`), ADR 030 (container facts + subtree collapse)
@@ -61,11 +61,19 @@ constraints of their own; item requiredness rides on the array.)
 
 A front-end emits an **`ArrayNode`** for an array schema and populates `ContainerFacts`
 (`valueShape:'array'` + `choices` for a finite scalar-choice set, or an `item` descriptor
-otherwise). `defaultPresentation` **collapses a `valueShape:'array' && choices` container to
-one multiselect/checkboxes leaf by default**, while an object array / object subtree stays
-decomposed unless a resolver opts in (ADR 030 §5). `jsonSchemaToTree` runs
-`present(defaultPresentation)` so its returned tree is fully lowered. Front-ends become pure
-**structural transcribers** — they extract facts, they never pick widgets or collapse.
+otherwise — choices XOR item). `defaultPresentation` **collapses a `valueShape:'array' &&
+choices` container to one multiselect/checkboxes leaf by default**, while an object array /
+object subtree stays decomposed unless a resolver opts in (ADR 030 §5). `jsonSchemaToTree`
+runs `present(defaultPresentation)` so its returned tree is fully lowered. Front-ends become
+pure **structural transcribers** — they extract facts, they never pick widgets or collapse.
+
+Lazily-created runtime items (`ArrayNode.getItem(i)`, which the renderer uses for *every*
+rendered item and the submit walk uses to find nested array leaves) are produced by the
+front-end factory as raw structure, so they run through `presentDefaultItem` — the same
+default fold, scoped to one item subtree — to collapse their nested scalar-choice arrays
+consistently with the static tree. (Consumer resolvers still don't reach runtime items; that
+pre-existing asymmetry is unchanged and tracked separately in bd `jzi`, not introduced here —
+its fix likely rides on B3's `itemFactory` closure carrying the layered resolver.)
 
 ### 3. Core exposes neutral builders; front-ends call them with already-neutral input
 
@@ -105,10 +113,14 @@ re-exporting `jsonSchemaToTree` for one release is a migration convenience, not 
 
 ## Migration (staged; gate-green per PR)
 
-- **PR B1** — §1: remove `node.validation`, consolidate to `facts.constraints` (kills the
+- **PR B1 ✅** — §1: remove `node.validation`, consolidate to `facts.constraints` (kills the
   `minItems→minLength` wart). Core-internal, mechanical.
-- **PR B2** — §2: relocate the scalar-choice-array collapse parser→`present()` default (the
-  ADR 030 §3 amendment). `jsonSchemaToTree` runs `present(default)`; byte-identical output.
+- **PR B2 ✅** — §2: relocate the scalar-choice-array collapse parser→`present()` default (the
+  ADR 030 §3 amendment). `createArrayNode` always emits an `ArrayNode` (choices XOR item),
+  `jsonSchemaToTree` runs `present(default)`, and `getItem` runs `presentDefaultItem`;
+  `createMultiselectFieldNode`/`isPrimitiveArraySchema` are gone. Output is byte-identical
+  (the collapsed leaf's facts match the old multiselect leaf). Nested primitive arrays now
+  work as a side effect (relates to bd `ci4`).
 - **PR B3** — §3/§4/§5: neutral builders + `itemFactory`; generic `origin<S>`; drop
   `NodeBase.schema`; extract `@jsonschema-form/input-jsonschema`.
 

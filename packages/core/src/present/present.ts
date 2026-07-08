@@ -13,6 +13,7 @@
 import type {
   AnyFacts,
   AnyNode,
+  ArrayItemNode,
   ArrayNode,
   ChoiceOption,
   ContainerFacts,
@@ -458,4 +459,18 @@ export function present(
   resolve: PresentationResolver
 ): GroupNode {
   return presentNode(root, resolve) as GroupNode
+}
+
+/**
+ * Present a lazily-created array item under the SHIPPED default rule (ADR 030 §3).
+ * A runtime item — `ArrayNode.getItem(i)`, including seeds the renderer re-mints —
+ * is produced by the front-end factory as raw structure, so its nested
+ * scalar-choice arrays are still un-collapsed ArrayNodes. This folds the default
+ * over that subtree so a lazily-created item matches the static tree: nested
+ * scalar-choice arrays collapse to one multiselect/checkboxes leaf and every leaf
+ * gets its widget. Consumer resolvers are NOT applied to runtime items (unchanged
+ * from when the front-end baked the collapse in — tracked separately).
+ */
+export function presentDefaultItem(item: ArrayItemNode): ArrayItemNode {
+  return presentNode(item, defaultPresentation) as ArrayItemNode
 }

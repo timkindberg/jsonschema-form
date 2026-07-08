@@ -323,9 +323,16 @@ Implementing this ADR surfaced two refinements, agreed with the decider:
    into `present()` would drag a wart into the clean stage; instead PR B removes the
    redundant `node.validation` field (moving array-length constraints into
    `facts.constraints`, which already has `minItems`/`maxItems` slots) so the wart **dies**
-   as the collapse relocates. Until then the parser keeps collapsing scalar-choice arrays
-   to a `LeafFacts` leaf, and `defaultPresentation` returns `undefined` for every container
-   (the §3 no-op), guarded by `!('primitive' in facts)`.
+   as the collapse relocates.
+
+   **Landed (PR B2, ADR 033 §2):** `createArrayNode` now always emits an `ArrayNode`
+   carrying `choices` (finite scalar-choice set) *or* an `item` descriptor (open-ended),
+   `defaultPresentation` collapses the `valueShape:'array' && choices` container to one
+   multiselect/checkboxes leaf, and `jsonSchemaToTree` runs `present(default)` so its
+   returned tree is fully lowered. `createMultiselectFieldNode`/`isPrimitiveArraySchema` are
+   deleted; the front-end is a pure structural transcriber. Runtime items (`getItem`) run the
+   same default fold via `presentDefaultItem`, so nested scalar-choice arrays collapse there
+   too — which incidentally makes nested primitive arrays work (relates to bd `ci4`).
 
 2. **Naming: the resolver receives `AnyFacts` (the `LeafFacts | ContainerFacts` union),
    with `NodeFacts` as the shared base interface.** §1 sketched a single `NodeFacts`; in
@@ -344,7 +351,7 @@ and **collapses** a container into one leaf-like `FieldNode` (pruning the subtre
 preserving `valueShape`, carrying resolver `args`); submit assembly already keys on
 `facts.valueShape === 'array'`, so a collapsed object-array submits `Array<…>` with no
 further change. **Not** in PR A: rendering the collapsed control (§7, needs the
-async-options slot) and the §3 scalar-choice relocation (PR B, above).
+async-options slot) and the §3 scalar-choice relocation (landed later in PR B2, above).
 
 ---
 
