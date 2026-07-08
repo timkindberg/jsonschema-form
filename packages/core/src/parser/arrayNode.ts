@@ -1,6 +1,6 @@
-import { buildFieldFacts, createFieldNode } from './fieldNode'
+import { createFieldNode } from './fieldNode'
 import { createGroupNode } from './groupNode'
-import { presentDefaultLeaf } from '../present/present'
+import { presentDefaultItem } from '../present/present'
 import {
   buildValidation,
   type JSONSchemaObject,
@@ -16,18 +16,24 @@ import type {
   ContainerFacts,
   FieldNode,
   ItemDescriptor,
+  SelectOption,
   WalkHandlers,
 } from './nodeTypes'
 
 /**
- * Creates an ArrayNode for array-type schemas
- * Handles both primitive arrays (multiselect) and complex arrays (add/remove items)
+ * Transcribe an array schema into an {@link ArrayNode} (ADR 033 §2). The front-end
+ * is a pure STRUCTURAL transcriber: it always emits an add/remove ArrayNode and
+ * records the neutral facts — a finite `choices` set for a scalar-choice array
+ * (enum/oneOf items), or an open-ended `item` descriptor otherwise (choices XOR
+ * item). It does NOT collapse: `present()`'s default rule folds a scalar-choice
+ * array into one multiselect/checkboxes leaf (ADR 030 §3), so the *lowering*
+ * decision lives in one place and every front-end inherits it.
  */
 export function createArrayNode(
   path: string,
   schema: JSONSchemaObject,
   required: boolean
-): ArrayNode | FieldNode {
+): ArrayNode {
   const itemsSchema = schema.items
 
   // items must be a single schema object (not an array or boolean)
@@ -50,14 +56,6 @@ export function createArrayNode(
   // Now we know items is a JSONSchemaObject
   const itemSchemaObject = itemsSchema as JSONSchemaObject
 
-  // Check if this is a primitive array (should be multiselect FieldNode)
-  const isPrimitive = isPrimitiveArraySchema(itemSchemaObject)
-  if (isPrimitive) {
-    // Return a FieldNode with widget: 'multiselect'
-    return createMultiselectFieldNode(path, schema, required)
-  }
-
-  // Complex array - create ArrayNode with ArrayItemNode children
   const minItems = typeof schema.minItems === 'number' ? schema.minItems : 0
 
   // Create initial children based on minItems
@@ -91,15 +89,19 @@ export function createArrayNode(
     }),
   }
 
-  // Container facts (ADR 030 §1): a subtree array submits an array value and has
-  // an open-ended element source (an `item` descriptor, NOT `choices`), so the
-  // default rule leaves it add/remove; a resolver may collapse it into one
-  // array-valued widget and supply the option source via `args` (ADR 030 §4/§5).
   const constraints = buildValidation(schema, required)
   if (typeof schema.minItems === 'number')
     constraints.minItems = schema.minItems
   if (typeof schema.maxItems === 'number')
     constraints.maxItems = schema.maxItems
+
+  // Container facts (ADR 030 §1): a subtree array submits an array value. A finite
+  // scalar-choice set (enum/oneOf items) self-identifies as `choices`, which
+  // present()'s default rule collapses into one multiselect/checkboxes leaf; an
+  // open-ended element source carries an `item` descriptor instead and stays
+  // add/remove (a resolver may collapse it, supplying the source via `args` —
+  // ADR 030 §4/§5). Choices XOR item.
+  const choices = buildArrayChoices(itemSchemaObject)
   const facts: ContainerFacts = {
     path,
     label: schema.title || path || 'root',
@@ -108,7 +110,9 @@ export function createArrayNode(
     constraints,
     attrs: { id: path, name: path },
     origin: { source: 'jsonschema', schema },
-    item: buildItemDescriptor(itemSchemaObject),
+    ...(choices
+      ? { choices }
+      : { item: buildItemDescriptor(itemSchemaObject) }),
   }
   if (schema.description) facts.description = schema.description
 
@@ -128,9 +132,14 @@ export function createArrayNode(
     // Parts API
     parts,
 
-    // Factory method for creating items dynamically
+    // Factory method for creating items dynamically. The item is presented under
+    // the default rule so its nested scalar-choice arrays collapse exactly like
+    // the static tree (ADR 030 §3) — the front-end factory emits raw structure,
+    // present() does the lowering, here too.
     getItem(index: number) {
-      return createArrayItemNode(path, index, itemSchemaObject, required)
+      return presentDefaultItem(
+        createArrayItemNode(path, index, itemSchemaObject, required)
+      )
     },
 
     // `targetPath` is relative to this array; its leading segment is an item
@@ -201,11 +210,10 @@ export function createArrayItemNode(
   if (itemSchema.type === 'object' && itemSchema.properties) {
     child = createGroupNode(itemPath, itemSchema, required)
   } else if (itemSchema.type === 'array') {
-    const childArray = createArrayNode(itemPath, itemSchema, required)
-    if (childArray.nodeType !== 'array') {
-      throw new Error('Nested primitive arrays not yet supported')
-    }
-    child = childArray
+    // A nested array is just another ArrayNode; if its items are a scalar-choice
+    // set, present() collapses that inner array into a multiselect leaf like any
+    // other (the front-end no longer special-cases it).
+    child = createArrayNode(itemPath, itemSchema, required)
   } else {
     child = createFieldNode(itemPath, itemSchema, required)
   }
@@ -294,42 +302,23 @@ function buildItemDescriptor(itemSchema: JSONSchemaObject): ItemDescriptor {
 }
 
 /**
- * Check if an array schema should render as multiselect (has enum or oneOf)
- * Arrays of plain primitives without enum/oneOf will use dynamic add/remove pattern
+ * The finite option set of a scalar-choice array (enum/oneOf items), as neutral
+ * {@link SelectOption}s, or `undefined` for an open-ended element source. This is
+ * what makes present()'s default rule collapse the array into one multiselect (an
+ * empty `[]` — e.g. a structural `oneOf` with no `const` branches, bd aml — is
+ * still a choice set and still collapses, preserving prior behavior).
  */
-function isPrimitiveArraySchema(itemsSchema: JSONSchemaObject): boolean {
-  // Only treat as multiselect if there are predefined options
-  if (itemsSchema.enum || itemsSchema.oneOf) {
-    return true
-  }
-  return false
-}
-
-/**
- * Creates a FieldNode with widget 'multiselect' for primitive arrays.
- *
- * The array→multiselect *collapse* is a structural (facts) decision the parser
- * owns; the resulting leaf's widget + parts come solely from the present stage's
- * Core catalog (ADR 029 / bd 9pb), so a `valueShape: 'array'` leaf with `choices`
- * derives its `<select multiple>` parts via `deriveSelectParts`.
- */
-function createMultiselectFieldNode(
-  path: string,
-  schema: JSONSchemaObject,
-  required: boolean
-): FieldNode {
-  const itemsSchema = schema.items as JSONSchemaObject
-
-  // Build options (neutral choices) from enum or oneOf
-  let options: Array<{ value: string | number; label: string }> = []
-
+function buildArrayChoices(
+  itemsSchema: JSONSchemaObject
+): SelectOption[] | undefined {
   if (itemsSchema.enum) {
-    options = (itemsSchema.enum as Array<string | number>).map((value) => ({
+    return (itemsSchema.enum as Array<string | number>).map((value) => ({
       value,
       label: String(value),
     }))
-  } else if (itemsSchema.oneOf) {
-    options = (
+  }
+  if (itemsSchema.oneOf) {
+    return (
       itemsSchema.oneOf as Array<{ const: string | number; title?: string }>
     )
       .filter((item) => item && typeof item === 'object' && 'const' in item)
@@ -338,46 +327,5 @@ function createMultiselectFieldNode(
         label: item.title || String(item.const),
       }))
   }
-
-  // Array-length constraints live as `minItems`/`maxItems` on the single
-  // `facts.constraints` home (ADR 033 §1) — not smuggled into `minLength`.
-  const constraints = buildValidation(schema, required)
-  if (typeof schema.minItems === 'number')
-    constraints.minItems = schema.minItems
-  if (typeof schema.maxItems === 'number')
-    constraints.maxItems = schema.maxItems
-
-  const facts = buildFieldFacts({
-    path,
-    schema,
-    required,
-    valueShape: 'array',
-    constraints,
-    choices: options,
-  })
-
-  // A `valueShape: 'array'` leaf with `choices` resolves to `multiselect` via the
-  // shipped default rule, which derives its `<select multiple>` control parts — so
-  // the widget/parts come from the same source as every other leaf (no cast).
-  const wp = presentDefaultLeaf(facts)
-  const node: FieldNode = {
-    nodeType: 'field',
-    path,
-    schema,
-    widget: wp.widget,
-    facts,
-    isRoot: path === '',
-    depth: path ? path.split('.').length : 0,
-    parts: wp.parts,
-
-    isField: true,
-    isGroup: false,
-    isArray: false,
-    isArrayItem: false,
-
-    toJSON() {
-      return serializeNode(this)
-    },
-  }
-  return node
+  return undefined
 }
