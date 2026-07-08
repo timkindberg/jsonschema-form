@@ -1,16 +1,20 @@
 // Executable spec for ADR 030 (bd fcj) — container facts + subtree collapse.
 //
-// PR A implements the tree-level contract: facts are projected onto CONTAINER
-// nodes (ArrayNode/GroupNode), and `present()` offers a container to the resolver
-// and COLLAPSES its subtree into one leaf-like node when the resolver returns a
-// widget. The default rule stays a no-op for containers (object arrays stay
-// add/remove; groups stay decomposed) — only a consumer resolver opts a container
-// in. Rendering the collapsed control + the async object source (§4/§7) is
-// deferred (needs the async-options slot); the scalar-choice-array collapse
-// relocation (§3 amendment) is deferred to the front-end extraction (PR B).
+// The tree-level contract: neutral facts are projected onto CONTAINER nodes
+// (ArrayNode/GroupNode), and `present()` offers a container to the resolver and
+// COLLAPSES its subtree into one leaf-like node when the resolver returns a widget.
+// The default rule is a no-op for containers (object arrays stay add/remove; groups
+// stay decomposed) — only a consumer resolver opts a container in. Rendering the
+// collapsed control + its async object source (ADR 030 §4/§7) needs the
+// async-options slot and is tracked separately (see the `it.todo`s below).
 
 import { describe, it, expect } from 'vitest'
 import { jsonSchemaToTree } from '../parser/index'
+import {
+  assertArrayNode,
+  assertField,
+  assertGroupNode,
+} from '../parser/nodeTestUtils'
 import type { JSONSchema } from '../types'
 import {
   present,
@@ -30,7 +34,7 @@ const objectArraySchema = {
         type: 'object',
         properties: {
           name: { type: 'string' },
-          type: { type: 'string' },
+          label: { type: 'string' },
         },
       },
     },
@@ -65,9 +69,10 @@ const objectSubtreeSchema = {
   },
 } as const
 
-// A leaf enum-array — already one control today (a checkbox group at this size).
-// In PR A the parser still collapses scalar-choice arrays to a LEAF, so this is a
-// FieldNode with LeafFacts, contrasted with the object-array *container* above.
+// A scalar-choice (enum) array — a finite, self-identifying in-schema option set.
+// It resolves to a single choice control (a checkbox group at this size): a
+// FieldNode with LeafFacts + `choices`, contrasted with the open-ended object-array
+// *container* above (which carries an `item` descriptor, not `choices`).
 const enumArraySchema = {
   type: 'object',
   properties: {
@@ -126,29 +131,27 @@ describe('container facts (ADR 030 §1)', () => {
   it('a subtree object-array carries ContainerFacts (valueShape:"array" + item descriptor, no choices)', () => {
     const tree = jsonSchemaToTree(objectArraySchema)
     const criteria = tree.children.find((c) => c.path === 'allowed_criteria')
-    expect(criteria?.nodeType).toBe('array')
-    if (criteria?.nodeType !== 'array') throw new Error('expected an array')
-    // ADR 030 §1: containers now carry a NodeFacts projection.
+    assertArrayNode(criteria)
+    // ADR 030 §1: containers carry a NodeFacts projection.
     expect(criteria.facts.valueShape).toBe('array')
     // Open-ended element source → an `item` descriptor, NOT finite `choices`.
     expect(criteria.facts.choices).toBeUndefined()
     expect(criteria.facts.item).toEqual({
       valueShape: 'object',
-      keys: ['name', 'type'],
+      keys: ['name', 'label'],
     })
   })
 
   it('a GroupNode carries ContainerFacts with valueShape:"object"', () => {
     const tree = jsonSchemaToTree(objectSubtreeSchema)
     const address = tree.children.find((c) => c.path === 'address')
-    expect(address?.nodeType).toBe('group')
-    if (address?.nodeType !== 'group') throw new Error('expected a group')
+    assertGroupNode(address)
     expect(address.facts.valueShape).toBe('object')
     expect(address.facts.choices).toBeUndefined()
     expect(address.facts.item).toBeUndefined()
   })
 
-  it('a leaf enum-array still carries LeafFacts with valueShape:"array" + choices (parser collapse unchanged in PR A)', () => {
+  it('a scalar-choice (enum) array resolves to a leaf: LeafFacts with valueShape:"array" + choices', () => {
     const tree = jsonSchemaToTree(enumArraySchema)
     const tags = tree.getField('tags')
     expect(tags?.widget).toBe('checkboxes')
@@ -188,16 +191,14 @@ describe('present() collapse (ADR 030 §5)', () => {
     const before = jsonSchemaToTree(objectArrayWithItems)
     const members = before.children.find((c) => c.path === 'members')
     // Precondition: minItems:2 gives the ArrayNode a subtree to prune.
-    if (members?.nodeType !== 'array') throw new Error('expected an array')
+    assertArrayNode(members)
     expect(members.children.length).toBe(2)
 
     const collapse: PresentationResolver = (f) =>
       f.path === 'members' ? { widget: 'multiselect' } : undefined
     const tree = present(before, layered(defaultPresentation, collapse))
     const collapsed = tree.children.find((c) => c.path === 'members')
-    expect(collapsed?.nodeType).toBe('field') // container → leaf
-    if (collapsed?.nodeType !== 'field') throw new Error('expected a field')
-    expect(collapsed.isField).toBe(true)
+    assertField(collapsed) // container → leaf
     expect('children' in collapsed).toBe(false) // subtree pruned
     expect(collapsed.widget).toBe('multiselect')
     expect(collapsed.facts.valueShape).toBe('array') // preserved (§2/§6)
@@ -221,7 +222,7 @@ describe('present() collapse (ADR 030 §5)', () => {
       f.path === 'members'
         ? {
             widget: 'multiselect',
-            args: { optionsSource, valueKey: 'name', labelKey: 'type' },
+            args: { optionsSource, valueKey: 'name', labelKey: 'label' },
           }
         : undefined
     const tree = present(
@@ -229,11 +230,14 @@ describe('present() collapse (ADR 030 §5)', () => {
       layered(defaultPresentation, collapse)
     )
     const members = tree.children.find((c) => c.path === 'members')
-    if (members?.nodeType !== 'field') throw new Error('expected a field')
+    assertField(members)
+    // Core carries `args` through verbatim and never interprets its keys:
+    // `optionsSource`/`valueKey`/`labelKey` are a convention shared between a
+    // resolver and the render layer, not a Core-enforced shape (ADR 030 §4).
     expect(members.args).toEqual({
       optionsSource,
       valueKey: 'name',
-      labelKey: 'type',
+      labelKey: 'label',
     })
     // The neutral facts carry NO runtime source / value identity.
     expect(members.facts.choices).toBeUndefined()
@@ -249,8 +253,7 @@ describe('present() collapse (ADR 030 §5)', () => {
       layered(defaultPresentation, collapse)
     )
     const address = tree.children.find((c) => c.path === 'address')
-    expect(address?.nodeType).toBe('field')
-    if (address?.nodeType !== 'field') throw new Error('expected a field')
+    assertField(address)
     expect(address.facts.valueShape).toBe('object')
     expect('children' in address).toBe(false)
   })
@@ -302,9 +305,9 @@ describe('container facts / subtree collapse — deferred (ADR 030)', () => {
   it.todo(
     'renders the collapsed object-array multiselect via the field.control slot + async options — §7'
   )
-  // §3 amendment — relocating the scalar-choice-array collapse parser→present as a
-  // default lands in PR B2 (node.validation was already removed in B1, ADR 033 §1).
+  // §3 amendment — the scalar-choice-array collapse moves from the front-end into
+  // present() as a default (bd 8o0), so front-ends stay pure structural transcribers.
   it.todo(
-    'default present() collapses scalar-choice arrays (parser→present relocation) — §3 amendment (PR B2)'
+    'default present() collapses scalar-choice arrays (structural array → leaf) — §3 amendment'
   )
 })
