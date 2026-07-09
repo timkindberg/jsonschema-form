@@ -44,8 +44,6 @@ export type {
   ValidationIssue,
   ValidationResult,
   Validator,
-  InferData,
-  FieldPath,
 } from './types'
 
 // Neutral builders (ADR 033 §3) — a front-end produces neutral facts/parts/

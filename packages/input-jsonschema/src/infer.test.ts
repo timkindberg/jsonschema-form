@@ -3,7 +3,7 @@ import type { FieldPath, InferData } from './infer'
 import type {
   FieldPath as PublicFieldPath,
   InferData as PublicInferData,
-} from './index'
+} from '@jsonschema-form/input-jsonschema'
 
 const _flatSchema = {
   type: 'object',
