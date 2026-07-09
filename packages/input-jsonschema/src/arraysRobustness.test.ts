@@ -11,8 +11,11 @@ import { choicegroupCtl } from './controlTestUtils'
 import { assertArrayNode, assertField } from './nodeTestUtils'
 import { submitWith } from './submitTestUtils'
 
-/** Structural snapshot for comparing nodes without function identity. */
-function nodeStructure(node: AnyNode): object {
+/** Structural snapshot for comparing nodes without function identity. Generic in
+ * the origin-schema type `S` (bd wo8): once `S` threads through `walk`,
+ * `AnyNode<S>` is invariant, so a front-end-specialized node (e.g.
+ * `AnyNode<JSONSchemaObject>`) is not assignable to `AnyNode<unknown>`. */
+function nodeStructure<S>(node: AnyNode<S>): object {
   const base = {
     nodeType: node.nodeType,
     path: node.path,
