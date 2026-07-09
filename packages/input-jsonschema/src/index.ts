@@ -10,3 +10,4 @@ export const VERSION = '0.0.0'
 
 export { jsonSchemaToTree } from './jsonSchemaToTree'
 export type { JSONSchema, JSONSchemaObject } from './types'
+export type { InferData, FieldPath } from './infer'
