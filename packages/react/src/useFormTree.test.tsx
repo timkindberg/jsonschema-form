@@ -59,7 +59,8 @@ describe('useFormTree', () => {
 
     const screen = await render(<Harness />)
     const submit = screen.getByRole('button', { name: 'Submit' })
-    const inputBeforeValidation = document.querySelector('input[name="name"]')
+    const name = screen.getByRole('textbox', { name: 'Name' })
+    const inputBeforeValidation = name.element()
 
     await submit.click()
     await expect
@@ -67,11 +68,9 @@ describe('useFormTree', () => {
       .toBe(1)
     expect(onValid).not.toHaveBeenCalled()
     expect(schemaFieldsIdentities.size).toBe(1)
-    expect(document.querySelector('input[name="name"]')).toBe(
-      inputBeforeValidation
-    )
+    expect(name.element()).toBe(inputBeforeValidation)
 
-    await screen.getByRole('textbox', { name: 'Name' }).fill('Ada')
+    await name.fill('Ada')
     await submit.click()
 
     await expect.poll(() => onValid.mock.calls.length).toBe(1)
@@ -140,6 +139,7 @@ describe('useFormTree', () => {
         touched: ReadonlySet<string>
         submitted: boolean
       }>()
+      expectTypeOf(bound.issues).toEqualTypeOf<ValidationIssue[]>()
 
       useFormTree(numberTree, { validator: numberValidator }).submit((data) => {
         expectTypeOf(data).toMatchObjectType<{ age: number }>()

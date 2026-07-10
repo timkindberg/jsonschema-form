@@ -51,7 +51,7 @@ export interface UseFormTreeOptions<
 > {
   /**
    * A side-loaded validator (ADR 019), normally from the same source adapter as
-   * the tree. When set, `submit` runs it, exposes `errors`, and only calls the
+   * the tree. When set, `submit` runs it, exposes `issues`, and only calls the
    * consumer handler when the data is valid.
    */
   validator?: Validator<Output>
@@ -87,7 +87,7 @@ export function useFormTree<S = unknown, Output = Record<string, unknown>>(
     [tree, resolvePresentation]
   )
 
-  const [errors, setErrors] = useState<ValidationIssue[]>([])
+  const [issues, setIssues] = useState<ValidationIssue[]>([])
   const [touched, setTouched] = useState<ReadonlySet<string>>(() => new Set())
   const [submitted, setSubmitted] = useState(false)
 
@@ -106,7 +106,7 @@ export function useFormTree<S = unknown, Output = Record<string, unknown>>(
       const result: ValidationResult<Output> = validator
         ? validator(data)
         : { valid: true, issues: [] as ValidationIssue[] }
-      setErrors(result.issues)
+      setIssues(result.issues)
       return result
     },
     [validator]
@@ -158,8 +158,8 @@ export function useFormTree<S = unknown, Output = Record<string, unknown>>(
   }, [form])
 
   const validation = useMemo<FormTreeValidation>(
-    () => ({ issues: errors, touched, submitted }),
-    [errors, touched, submitted]
+    () => ({ issues, touched, submitted }),
+    [issues, touched, submitted]
   )
 
   return {
@@ -168,7 +168,7 @@ export function useFormTree<S = unknown, Output = Record<string, unknown>>(
     submit,
     revalidate,
     validation,
-    errors,
+    issues,
     handleBlur,
     touched,
     submitted,
