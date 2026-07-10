@@ -16,14 +16,14 @@ import { createAjvValidator } from '@jsonschema-form/validation-ajv'
 import { useFormTree } from './useFormTree'
 import { ValidationProvider } from './renderer'
 
-const schema: JSONSchema = {
+const schema = {
   type: 'object',
   required: ['username'],
   properties: {
     username: { type: 'string', title: 'Username', minLength: 3 },
     zip: { type: 'string', title: 'Zip', pattern: '^[0-9]{5}$' },
   },
-}
+} satisfies JSONSchema
 const tree = jsonSchemaToTree(schema)
 
 function Harness({

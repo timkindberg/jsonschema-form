@@ -22,7 +22,7 @@ import { createAjvValidator } from '@jsonschema-form/validation-ajv'
 import { jsonSchemaToTree } from '@jsonschema-form/input-jsonschema'
 import type { JSONSchema } from '@jsonschema-form/input-jsonschema'
 
-const schema: JSONSchema = {
+const schema = {
   type: 'object',
   required: ['username', 'email'],
   properties: {
@@ -39,7 +39,7 @@ const schema: JSONSchema = {
       format: 'email',
     },
   },
-}
+} satisfies JSONSchema
 const tree = jsonSchemaToTree(schema)
 
 const policies: ShowErrorsWhen[] = ['always', 'touched', 'submit']

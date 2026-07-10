@@ -14,7 +14,7 @@ import { createAjvValidator } from '@jsonschema-form/validation-ajv'
 import { jsonSchemaToTree } from '@jsonschema-form/input-jsonschema'
 import type { JSONSchema } from '@jsonschema-form/input-jsonschema'
 
-const schema: JSONSchema = {
+const schema = {
   type: 'object',
   required: ['username'],
   properties: {
@@ -39,7 +39,7 @@ const schema: JSONSchema = {
       pattern: '^[0-9]{5}$',
     },
   },
-}
+} satisfies JSONSchema
 const tree = jsonSchemaToTree(schema)
 
 function App() {

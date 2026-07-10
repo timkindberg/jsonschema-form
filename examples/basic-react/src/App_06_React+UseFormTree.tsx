@@ -51,7 +51,7 @@ const schema: JSONSchema = {
 const tree = jsonSchemaToTree(schema)
 
 function App() {
-  const { form, SchemaFields } = useFormTree(tree)
+  const { SchemaFields, submit } = useFormTree(tree)
 
   const handleSubmit = (data: Record<string, unknown>) => {
     console.log('Form submitted with clean data:', data)
@@ -65,16 +65,16 @@ function App() {
       <p>
         Compile with <code>jsonSchemaToTree(schema)</code>, then bind React
         behavior with <code>useFormTree(tree)</code>. It returns{' '}
-        <code>{'{ form, SchemaFields }'}</code>. <code>SchemaFields</code>{' '}
+        <code>{'{ SchemaFields, submit }'}</code>. <code>SchemaFields</code>{' '}
         renders the form content; you own the <code>&lt;form&gt;</code> + submit
         (ADR 013).
       </p>
       <p>
-        Use <code>form.submit(onSubmit)</code> to automatically transform and
+        Use <code>submit(onSubmit)</code> to automatically transform and
         unflatten form data
       </p>
 
-      <form onSubmit={form.submit(handleSubmit)}>
+      <form onSubmit={submit(handleSubmit)}>
         <SchemaFields />
         <button type="submit">Submit</button>
       </form>

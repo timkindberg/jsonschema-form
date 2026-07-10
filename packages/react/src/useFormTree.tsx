@@ -13,6 +13,7 @@ import type {
   GroupNode,
   Validator,
   ValidationIssue,
+  ValidationResult,
   PresentationResolver,
 } from '@jsonschema-form/core'
 import {
@@ -34,13 +35,16 @@ export interface BoundSchemaFieldsProps {
 }
 
 /** Options for {@link useFormTree}. */
-export interface UseFormTreeOptions<S = unknown> {
+export interface UseFormTreeOptions<
+  S = unknown,
+  Output = Record<string, unknown>,
+> {
   /**
    * A side-loaded validator (ADR 019), normally from the same source adapter as
    * the tree. When set, `submit` runs it, exposes `errors`, and only calls the
    * consumer handler when the data is valid.
    */
-  validator?: Validator
+  validator?: Validator<Output>
   /**
    * Consumer presentation resolver (ADR 029). It runs above the shipped default
    * presentation and receives the tree's source-specific `origin.schema` type.
@@ -57,9 +61,9 @@ export interface UseFormTreeOptions<S = unknown> {
  * presentation, a bound `SchemaFields`, native submission, validation issues,
  * live revalidation, and touched/submit state.
  */
-export function useFormTree<S = unknown>(
+export function useFormTree<S = unknown, Output = Record<string, unknown>>(
   tree: GroupNode<S>,
-  options: UseFormTreeOptions<S> = {}
+  options: UseFormTreeOptions<S, Output> = {}
 ) {
   const { validator, resolvePresentation } = options
   const form = useMemo(
@@ -88,8 +92,8 @@ export function useFormTree<S = unknown>(
   }, [])
 
   const runValidator = useCallback(
-    (data: Record<string, unknown>) => {
-      const result = validator
+    (data: Record<string, unknown>): ValidationResult<Output> => {
+      const result: ValidationResult<Output> = validator
         ? validator(data)
         : { valid: true, issues: [] as ValidationIssue[] }
       setErrors(result.issues)
@@ -100,10 +104,12 @@ export function useFormTree<S = unknown>(
 
   /** Build a DOM submit handler that assembles data and gates on validation. */
   const submit = useCallback(
-    (onValid?: (data: Record<string, unknown>) => void) => {
+    (onValid?: (data: Output) => void) => {
       const run = form.submit((data) => {
         const result = runValidator(data)
-        if (result.valid) onValid?.(data)
+        if (result.valid) {
+          onValid?.(result.data === undefined ? (data as Output) : result.data)
+        }
       })
       return (event: FormEvent<HTMLFormElement>) => {
         setSubmitted(true)
