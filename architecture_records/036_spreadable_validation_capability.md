@@ -36,7 +36,7 @@ chrome and event timing that deliberately belong to the consumer.
 
 ```ts
 validation = {
-  issues: errors,
+  issues,
   touched,
   submitted,
 }
@@ -55,11 +55,12 @@ All three properties are required on the returned object, so the common spread
 path cannot omit touched or submitted state. The object is memoized and changes
 identity only when one of its members changes.
 
-The existing top-level `errors`, `touched`, and `submitted` values remain
-available for consumers that inspect individual state directly. The lower-level
-`ValidationProvider` interface also remains public and unchanged, including
-`showErrorsWhen`, so custom state owners can keep using it without
-`useFormTree`.
+The top-level raw state remains available as `issues`, `touched`, and
+`submitted` for consumers that inspect individual values directly. The old
+`errors` name is normalized to `issues` so the hook, Core validation contract,
+and provider use one term. The lower-level `ValidationProvider` interface also
+remains public and unchanged, including `showErrorsWhen`, so custom state owners
+can keep using it without `useFormTree`.
 
 `SchemaFields` remains a stable component type bound only to the presented form
 tree. Validation capability updates therefore re-render the owning consumer and
