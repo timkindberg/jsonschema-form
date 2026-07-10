@@ -1,7 +1,12 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
 import { z } from 'zod'
 import { zodToTree } from '@jsonschema-form/input-zod'
+import {
+  jsonSchemaToTree,
+  type JSONSchema,
+} from '@jsonschema-form/input-jsonschema'
+import { createAjvValidator } from '@jsonschema-form/validation-ajv'
 import { createZodValidator } from '@jsonschema-form/validation-zod'
 import { useFormTree, ValidationProvider } from './index'
 
@@ -10,6 +15,21 @@ const schema = z.object({
 })
 const tree = zodToTree(schema)
 const validator = createZodValidator(schema)
+const transformedValidator = createZodValidator(
+  z.object({
+    name: z.string().transform((value) => value.toUpperCase()),
+  })
+)
+
+const numberSchema = {
+  type: 'object',
+  properties: {
+    age: { type: 'number', title: 'Age' },
+  },
+  required: ['age'],
+} satisfies JSONSchema
+const numberTree = jsonSchemaToTree(numberSchema)
+const numberValidator = createAjvValidator(numberSchema)
 
 describe('useFormTree', () => {
   it('binds rendering, submission, and validation to a Zod-built tree', async () => {
@@ -44,5 +64,69 @@ describe('useFormTree', () => {
 
     await expect.poll(() => onValid.mock.calls.length).toBe(1)
     expect(onValid).toHaveBeenCalledWith({ name: 'Ada' })
+  })
+
+  it('passes Zod-transformed output to the success handler', async () => {
+    const onValid = vi.fn()
+
+    function Harness() {
+      const { SchemaFields, submit } = useFormTree(tree, {
+        validator: transformedValidator,
+      })
+
+      return (
+        <form noValidate onSubmit={submit(onValid)}>
+          <SchemaFields />
+          <button type="submit">Submit transformed</button>
+        </form>
+      )
+    }
+
+    const screen = await render(<Harness />)
+    await screen.getByRole('textbox', { name: 'Name' }).fill('Ada')
+    await screen.getByRole('button', { name: 'Submit transformed' }).click()
+
+    await expect.poll(() => onValid.mock.calls.length).toBe(1)
+    expect(onValid).toHaveBeenCalledWith({ name: 'ADA' })
+  })
+
+  it('passes AJV-coerced output to the success handler', async () => {
+    const onValid = vi.fn()
+
+    function Harness() {
+      const { SchemaFields, submit } = useFormTree(numberTree, {
+        validator: numberValidator,
+      })
+
+      return (
+        <form noValidate onSubmit={submit(onValid)}>
+          <SchemaFields />
+          <button type="submit">Submit coerced</button>
+        </form>
+      )
+    }
+
+    const screen = await render(<Harness />)
+    await screen.getByRole('spinbutton', { name: 'Age' }).fill('25')
+    await screen.getByRole('button', { name: 'Submit coerced' }).click()
+
+    await expect.poll(() => onValid.mock.calls.length).toBe(1)
+    expect(onValid).toHaveBeenCalledWith({ age: 25 })
+  })
+
+  it('infers validated output while keeping no-validator submission honest', () => {
+    function TypeHarness() {
+      useFormTree(tree, { validator: transformedValidator }).submit((data) => {
+        expectTypeOf(data).toEqualTypeOf<{ name: string }>()
+      })
+
+      useFormTree(tree).submit((data) => {
+        expectTypeOf(data).toEqualTypeOf<Record<string, unknown>>()
+      })
+
+      return null
+    }
+
+    expectTypeOf(TypeHarness).toBeFunction()
   })
 })
