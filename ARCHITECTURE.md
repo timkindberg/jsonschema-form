@@ -127,7 +127,7 @@ This lets consumers import the schema type from the JSON Schema front-end withou
 
 ### Input support catalogs
 
-Every maintained **input** package publishes an evidence-backed **`SUPPORT_CATALOG.md`** (linked from its `README.md`, included in npm pack output) documenting current compile behavior: supported, qualified, degraded, ignored, and rejected shapes, plus validation-only semantics where relevant. Update the catalog and `supportCatalog.test.ts` (or equivalent evidence tests) in the same change as compiler behavior.
+Every maintained **input** package publishes an evidence-backed **`SUPPORT_CATALOG.md`** (linked from its `README.md`, included in npm pack output) documenting current compile behavior: supported, qualified, degraded, ignored, and rejected shapes, plus validation-only semantics where relevant. Update the catalog and relevant capability tests (e.g. `zodToTree.test.ts` for Zod) in the same change as compiler behavior — not every catalog row needs its own test; source in compile/introspection modules is sufficient evidence for straightforward dispatch.
 
 Use the catalogs for triage — don't assume a keyword or Zod construct works before checking current behavior (e.g. JSON Schema `anyOf`, Zod non-literal unions).
 

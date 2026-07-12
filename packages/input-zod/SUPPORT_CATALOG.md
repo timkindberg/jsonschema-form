@@ -72,37 +72,37 @@ If Zod restructures `_zod.def`, **`zodInternals.ts` is the only file to touch.**
 | `z.string()` | supported | `input`, `attrs.type=text` | `zodToTree.test.ts` |
 | `z.number()` | supported | `input`, `attrs.type=number` | `zodToTree.test.ts` |
 | `z.int()` / `z.number().int()` | supported | `primitive: integer`, `attrs.type=number` | `zodToTree.test.ts` |
-| `z.coerce.number()` | supported | Same compile as `z.number()` | `supportCatalog.test.ts`; coercion is validation-only |
+| `z.coerce.number()` | supported | Same compile as `z.number()` | `readScalar` in `zodInternals.ts`; coercion is validation-only |
 | `z.boolean()` | supported | `input`, `attrs.type=checkbox` | `zodToTree.test.ts` |
-| `z.date()` | supported | `primitive: string`, `format: date` → `input type=date` | `supportCatalog.test.ts`, `zodInternals.ts` |
+| `z.date()` | supported | `primitive: string`, `format: date` → `input type=date` | `readScalar` in `zodInternals.ts` |
 | `.min()` / `.max()` (string) | supported | `constraints.minLength/maxLength` + HTML attrs | `zodToTree.test.ts` |
 | `.min()` / `.max()` (number) | supported | `constraints.minimum/maximum` + `min`/`max` attrs | `zodToTree.test.ts` |
 | `.regex(re)` | supported | `constraints.pattern` + `pattern` attr | `zodToTree.test.ts` |
-| `.email()` / `.url()` / `.datetime()` | supported | `facts.format` → native input type (`datetime` → `date-time` → `datetime-local`) | `zodToTree.test.ts`, `supportCatalog.test.ts` |
-| Other `string_format` checks (`uuid`, `ip`, …) | qualified | `facts.format` set; unknown formats → `input type=text` | `supportCatalog.test.ts` |
+| `.email()` / `.url()` / `.datetime()` | supported | `facts.format` → native input type (`datetime` → `date-time` → `datetime-local`) | `zodToTree.test.ts` |
+| Other `string_format` checks (`uuid`, `ip`, …) | qualified | `facts.format` set; unknown formats → `input type=text` | `mapStringFormat` / `readScalar` in `zodInternals.ts` |
 | `z.enum([…])` (non-empty) | supported | `radio` if ≤5 options else `select` | `zodToTree.test.ts` |
 | `z.union([z.literal(…), …])` (all string/number literals) | supported | Same as enum | `zodToTree.test.ts` |
 | `z.union([z.literal(1), z.literal(2)])` | supported | Numeric primitive + choice widgets | `zodToTree.test.ts` |
-| `z.literal('x')` alone | degraded | Plain string `input`; **no** `choices` | `supportCatalog.test.ts` — use `enum` or literal union for choices |
-| `z.literal(42)` alone | degraded | Plain number `input`; **no** `choices` | `supportCatalog.test.ts` |
-| `z.literal(true)` / `z.literal(false)` alone | degraded | `primitive: boolean`, checkbox input; **no** `choices` | `supportCatalog.test.ts` |
-| `z.union([z.string(), z.number()])` | degraded | Plain string `input`; union not represented | `supportCatalog.test.ts`; bead `jsonschema-form-miu` |
-| `z.discriminatedUnion(…)` | degraded | Same as non-literal union — string `input` | `supportCatalog.test.ts`; bead `jsonschema-form-miu` |
-| `z.union` with boolean/null literal members | degraded | Not a choice set (`readChoices` → `undefined`); string `input` | `readChoices` in `zodInternals.ts`, `supportCatalog.test.ts` |
-| `z.intersection()` / `.and()` | degraded | Plain string `input`; shapes not merged | `supportCatalog.test.ts` |
-| `z.record(…)` | degraded | Plain string `input`; map not decomposed | `supportCatalog.test.ts`; bead `jsonschema-form-33i` |
-| `z.tuple([…])` | degraded | Plain string `input`; tuple not decomposed | `supportCatalog.test.ts`; bead `jsonschema-form-6xz` |
-| `z.lazy(() => …)` | degraded | Plain string `input`; lazy graph not expanded | `supportCatalog.test.ts`; bead `jsonschema-form-fng` |
-| `.transform()` / `z.pipe()` | degraded | Plain string `input` (unwrap stops at pipe/transform wrapper) | `supportCatalog.test.ts` |
-| `.brand()` | qualified | Inner scalar facts; brand invisible to tree | `supportCatalog.test.ts` — brand in `origin.schema` only |
-| `z.any()`, `z.unknown()`, `z.never()` | degraded | Plain string `input` | `supportCatalog.test.ts` |
-| `z.null()`, `z.undefined()`, `z.void()` | degraded | Plain string `input` | `supportCatalog.test.ts` |
-| `z.nan()`, `z.bigint()` | degraded | Plain string `input` | `supportCatalog.test.ts` |
-| `.refine()` / `.superRefine()` | qualified | Inner scalar facts preserved through unwrap | `supportCatalog.test.ts` — predicate is validation-only |
-| `.default()` / `.prefault()` requiredness | supported | `unwrap` marks owning key optional (`constraints.required: false`) | `zodToTree.test.ts`, `supportCatalog.test.ts` |
-| `.default()` / `.prefault()` value | ignored (prefill) | No initial value in tree or HTML attrs | `supportCatalog.test.ts`; parse-time default is validation-only; prefill bead `jsonschema-form-2qx` |
-| `.readonly()` | supported (pass-through) | Unwrapped; inner facts compiled; no effect on requiredness | `supportCatalog.test.ts` |
-| `.catch()` | supported (pass-through) | Unwrapped; inner facts compiled; key stays **required** | `supportCatalog.test.ts` — catch fallback is validation-only |
+| `z.literal('x')` alone | degraded | Plain string `input`; **no** `choices` | `zodToTree.test.ts` — use `enum` or literal union for choices |
+| `z.literal(42)` alone | degraded | Plain number `input`; **no** `choices` | `zodToTree.test.ts` |
+| `z.literal(true)` / `z.literal(false)` alone | degraded | `primitive: boolean`, checkbox input; **no** `choices` | `zodToTree.test.ts` |
+| `z.union([z.string(), z.number()])` | degraded | Plain string `input`; union not represented | `zodToTree.test.ts`; bead `jsonschema-form-miu` |
+| `z.discriminatedUnion(…)` | degraded | Same as non-literal union — string `input` | `zodToTree.test.ts`; bead `jsonschema-form-miu` |
+| `z.union` with boolean/null literal members | degraded | Not a choice set (`readChoices` → `undefined`); string `input` | `readChoices` in `zodInternals.ts`, `zodToTree.test.ts` |
+| `z.intersection()` / `.and()` | degraded | Plain string `input`; shapes not merged | `zodToTree.test.ts` |
+| `z.record(…)` | degraded | Plain string `input`; map not decomposed | `zodToTree.test.ts`; bead `jsonschema-form-33i` |
+| `z.tuple([…])` | degraded | Plain string `input`; tuple not decomposed | `zodToTree.test.ts`; bead `jsonschema-form-6xz` |
+| `z.lazy(() => …)` | degraded | Plain string `input`; lazy graph not expanded | `zodToTree.test.ts`; bead `jsonschema-form-fng` |
+| `.transform()` / `z.pipe()` | degraded | Plain string `input` (unwrap stops at pipe/transform wrapper) | `zodToTree.test.ts` |
+| `.brand()` | qualified | Inner scalar facts; brand invisible to tree | `unwrap` in `zodInternals.ts` — brand in `origin.schema` only |
+| `z.any()`, `z.unknown()`, `z.never()` | degraded | Plain string `input` | `readScalar` default in `zodInternals.ts` |
+| `z.null()`, `z.undefined()`, `z.void()` | degraded | Plain string `input` | `readScalar` default in `zodInternals.ts` |
+| `z.nan()`, `z.bigint()` | degraded | Plain string `input` | `readScalar` default in `zodInternals.ts` |
+| `.refine()` / `.superRefine()` | qualified | Inner scalar facts preserved through unwrap | `zodToTree.test.ts` — predicate is validation-only |
+| `.default()` / `.prefault()` requiredness | supported | `unwrap` marks owning key optional (`constraints.required: false`) | `zodToTree.test.ts` |
+| `.default()` / `.prefault()` value | ignored (prefill) | No initial value in tree or HTML attrs | `zodToTree.test.ts`; parse-time default is validation-only; prefill bead `jsonschema-form-2qx` |
+| `.readonly()` | supported (pass-through) | Unwrapped; inner facts compiled; no effect on requiredness | `unwrap` in `zodInternals.ts` |
+| `.catch()` | supported (pass-through) | Unwrapped; inner facts compiled; key stays **required** | `zodToTree.test.ts` — catch fallback is validation-only |
 
 ### Choice presentation defaults (scalar)
 
@@ -120,8 +120,8 @@ Threshold: `OPTION_COUNT_THRESHOLD` in `packages/core/src/present/present.ts`.
 |------------------|--------|------------------|----------|
 | `z.object({ key: schema, … })` | supported | `GroupNode`; one child per shape entry | `zodToTree.test.ts` |
 | Nested `z.object` property | supported | Nested `GroupNode`; dotted paths | `zodToTree.test.ts` |
-| `z.object({})` (empty) | qualified | `GroupNode` with zero children | `supportCatalog.test.ts` |
-| `.strict()` / `.passthrough()` / `.strip()` | ignored | Only explicit `shape` keys become children; catchall mode not read | `supportCatalog.test.ts` |
+| `z.object({})` (empty) | qualified | `GroupNode` with zero children | `compileGroup` in `compile.ts` |
+| `.strict()` / `.passthrough()` / `.strip()` | ignored | Only explicit `shape` keys become children; catchall mode not read | `compileGroup` in `compile.ts` |
 | Requiredness from wrapper chain | supported | `constraints.required` per child | `zodToTree.test.ts` |
 
 ### Array branch (`z.array`)
@@ -133,7 +133,7 @@ Threshold: `OPTION_COUNT_THRESHOLD` in `packages/core/src/present/present.ts`.
 | `z.array(z.string())` (open scalar) | supported | `ArrayNode` + `item: { valueShape: 'scalar' }` | `zodToTree.test.ts` |
 | `z.array(z.enum(…))` / literal union element | supported | Container `choices`; collapses to `checkboxes`/`multiselect` | `zodToTree.test.ts` |
 | `z.array(z.object({…}))` | supported | `item: { valueShape: 'object', keys: [...] }` | `zodToTree.test.ts` |
-| Nested `z.array(z.array(…))` | supported | `item: { valueShape: 'array' }` | `supportCatalog.test.ts` |
+| Nested `z.array(z.array(…))` | supported | `item: { valueShape: 'array' }` | `buildItemDescriptor` in `compile.ts` |
 | `.min(n)` / `.max(n)` on array | supported | `minItems`/`maxItems` + seed items | `zodToTree.test.ts` |
 | `z.tuple([…])` as **element** | degraded | If tuple ever nested under array dispatch, same as tuple row | N/A today — tuple never reaches array compile |
 
@@ -235,10 +235,10 @@ Internal modules (`compile.ts`, `zodInternals.ts`) are not public API.
 | Structural compile | `src/compile.ts` | `zodToTree.test.ts` |
 | Introspection | `src/zodInternals.ts` | `zodToTree.test.ts` |
 | Default widgets | `packages/core/src/present/present.ts` | `conformance.test.ts` (oracle) |
-| Degraded / ambiguous shapes | `compile.ts` dispatch | `supportCatalog.test.ts` |
+| Degraded / ambiguous shapes | `compile.ts` dispatch | `zodToTree.test.ts` |
 | Cross-front-end parity | — | `conformance.test.ts` |
 
-When changing behavior, update **this file** and the matching test in `supportCatalog.test.ts` or an existing suite.
+When changing behavior, update **this file** and relevant capability tests in `zodToTree.test.ts` when the change is user-visible or non-obvious; straightforward dispatch in `compile.ts` / `zodInternals.ts` is sufficient evidence on its own.
 
 ---
 
@@ -257,7 +257,7 @@ When changing behavior, update **this file** and the matching test in `supportCa
 
 ## Corrections vs common assumptions
 
-- **Zod unions are not variant subforms.** Non-literal unions compile to a plain string `input` (`supportCatalog.test.ts`), not a branch picker.
+- **Zod unions are not variant subforms.** Non-literal unions compile to a plain string `input` (`zodToTree.test.ts`), not a branch picker.
 - **`z.discriminatedUnion` is not special-cased.** It introspects as `def.type === 'union'` and degrades the same way.
 - **Single `z.literal(...)` is not a choice field** — string, number, and boolean literals all compile as plain scalar inputs without `facts.choices`. Use `z.enum` or a union of literals for choices.
 - **`.default()` / `.prefault()` requiredness is supported** — `unwrap` marks the owning key optional. Only **prefill** of the default value is ignored at compile time (validation-only on parse); prefill UI is bead `jsonschema-form-2qx`.
