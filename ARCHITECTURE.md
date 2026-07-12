@@ -125,6 +125,8 @@ export type { JSONSchema } from 'json-schema-typed/draft-07'
 
 This lets consumers import the schema type from the JSON Schema front-end without knowing its internal dependencies; Core itself imports no schema language.
 
+What the JSON Schema front-end accepts and how it maps to the default form is documented in **[packages/input-jsonschema/SUPPORT_CATALOG.md](./packages/input-jsonschema/SUPPORT_CATALOG.md)** (evidence-backed; maintained under bead `jsonschema-form-00s`). Use it for triage and to avoid assuming keywords (e.g. `anyOf`) work before checking current behavior.
+
 ## What We Decided Against
 
 ### ❌ High-Level "Kitchen Sink" Components
