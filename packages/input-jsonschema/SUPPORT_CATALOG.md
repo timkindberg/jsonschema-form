@@ -3,7 +3,7 @@
 **Package:** `@jsonschema-form/input-jsonschema`  
 **Entry point:** `jsonSchemaToTree(schema)`  
 **Schema dialect:** [draft-07](https://json-schema.org/draft-07/json-schema-release-notes.html) types via `json-schema-typed`. The compiler reads only the keyword subset documented below; later-draft keys may appear in documents but are inert unless noted.
-**Maintenance:** Update this catalog and its evidence tests in the same change as compiler behavior. Initial catalog work is tracked by bead `jsonschema-form-00s`.
+**Maintenance:** Update this catalog and the relevant capability tests in the same change as compiler behavior. Initial catalog work is tracked by bead `jsonschema-form-00s`.
 
 This document records **what the compiler does today**, not what we intend. Every non-obvious claim should be backed by source and/or tests (see [Evidence](#evidence)).
 
@@ -47,7 +47,7 @@ The front-end is a **structural transcriber** (ADR 033): it reads keywords into 
 |-------|--------|----------------------|-------|
 | `{ type: 'object', properties: {…} }` | supported | `GroupNode` root; one child per property | Standard entry shape. |
 | Boolean root (`true` / `false`) | rejected | — | Throws: `Boolean schemas are not yet supported`. |
-| Root without `type: 'object'` | supported (qualified) | Still compiles if `properties` present on root | `compileRoot` → `compileGroup`; `supportCatalog.test.ts` |
+| Root without `type: 'object'` | supported (qualified) | Still compiles if `properties` present on root | `compileRoot` → `compileGroup` (`compile.ts`) |
 
 ### Scalar leaf (`type` string / number / integer / boolean)
 
@@ -59,20 +59,20 @@ The front-end is a **structural transcriber** (ADR 033): it reads keywords into 
 | `enum: […]` (non-empty string/number options) | supported | `radio` if ≤5 options else `select`; labels = `String(value)` | `edgeSchemas.test.ts`, `present.test.ts` (bd cm7) |
 | `enum: []` | supported (qualified) | Plain `input` (empty enum ignored) | `edgeSchemas.test.ts` |
 | `oneOf: [{ const, title? }, …]` with string/number `const` values | supported | Same as `enum`; `title` → option label, else `String(const)` | `parser.test.ts`, `edgeSchemas.test.ts`, ADR 003 |
-| `oneOf` without `const` on branches | supported (qualified) | `radio` with **zero options** (`choices: []`) | `supportCatalog.test.ts` |
+| `oneOf` without `const` on branches | supported (qualified) | `radio` with **zero options** (`choices: []`) | `edgeSchemas.test.ts` |
 | `oneOf` + `type` omitted on property | supported | Choice field if `const` branches exist | `edgeSchemas.test.ts` (`plan` field) |
-| `anyOf` | **ignored** | Modifier not read; compiles as untyped string `input` from resolved subschema | `supportCatalog.test.ts` — **not** variant subforms |
-| `allOf` | **ignored** | Modifier not read; branch constraints not merged; untyped string `input` if no `type` | `supportCatalog.test.ts`; bead `jsonschema-form-0z9` |
-| `const` | **ignored** | Untyped string `input` | `supportCatalog.test.ts` |
+| `anyOf` | **ignored** | Modifier not read; compiles as untyped string `input` from resolved subschema | `edgeSchemas.test.ts` — **not** variant subforms |
+| `allOf` | **ignored** | Modifier not read; branch constraints not merged; untyped string `input` if no `type` | `edgeSchemas.test.ts`; bead `jsonschema-form-0z9` |
+| `const` | **ignored** | Untyped string `input` | `compile.ts` (absence) |
 | `format` (known set) | supported | Maps to native `<input type>` (see [Formats](#formats)) | `present.test.ts` (bd 672) |
 | `format` (unknown) | supported (qualified) | `input`, `type=text`; `facts.format` still set | `errorHandling.test.ts` |
 | `minLength` / `maxLength` / `pattern` | supported | Copied to `facts.constraints` and HTML attrs | `parser.test.ts` |
 | `minimum` / `maximum` | supported | Copied to `facts.constraints` and `min`/`max` attrs | `parser.test.ts` |
 | `default` | ignored | Not read at compile; no prefill in tree or shipped native submit | `compile.ts` (absence); bead `jsonschema-form-2qx` |
 | `readOnly` / `writeOnly` | ignored | Annotations not copied to tree; shipped stack has no read-only enforcement | `compile.ts` (absence) |
-| Missing `type` with `enum` | supported | Choice field from `enum` | `supportCatalog.test.ts` |
+| Missing `type` with `enum` | supported | Choice field from `enum` | `compile.ts` `buildScalarChoices` |
 | Missing `type` otherwise | supported (qualified) | `primitive: 'string'`, `input` | `compile.ts` `toPrimitive` default |
-| Array-valued `type`, e.g. `['number', 'null']` | ignored | Union members are not interpreted; falls back to string `input` | `supportCatalog.test.ts` |
+| Array-valued `type`, e.g. `['number', 'null']` | ignored | Union members are not interpreted; falls back to string `input` | `edgeSchemas.test.ts` |
 
 ### Choice presentation defaults (scalar)
 
@@ -91,8 +91,8 @@ Threshold: `OPTION_COUNT_THRESHOLD` in `packages/core/src/present/present.ts` (b
 | `properties` + nested schemas | supported | `GroupNode`; children compiled recursively | `parser.test.ts` |
 | `required: ['a', …]` on object | supported | Sets `facts.constraints.required` per child | `parser.test.ts` |
 | `title` / `description` on object | supported | Group `parts.label` / `parts.description` when present | `parser.test.ts` |
-| `type: 'object'` **without** `properties` | supported (qualified) | Compiles as **leaf** `FieldNode` (`input`), not an empty group | `supportCatalog.test.ts` |
-| `additionalProperties` | ignored | Only explicit `properties` become children | `supportCatalog.test.ts` |
+| `type: 'object'` **without** `properties` | supported (qualified) | Compiles as **leaf** `FieldNode` (`input`), not an empty group | `edgeSchemas.test.ts` |
+| `additionalProperties` | ignored | Only explicit `properties` become children | `edgeSchemas.test.ts` |
 | `patternProperties` | ignored | Not read in `compileGroup` | `compile.ts` (absence) |
 | `minProperties` / `maxProperties` | ignored | Not read | `compile.ts` (absence) |
 | `dependencies` / `dependentRequired` / `dependentSchemas` | ignored | Not read | `compile.ts` (absence) |
@@ -103,9 +103,9 @@ Threshold: `OPTION_COUNT_THRESHOLD` in `packages/core/src/present/present.ts` (b
 | Keyword / shape | Status | Default behavior | Evidence |
 |-----------------|--------|------------------|----------|
 | Homogeneous `items: { … }` (single schema) | supported | See sub-rows below | `parser.test.ts`, `arraysRobustness.test.ts` |
-| `items` omitted | rejected | Throws: must have `items` | `supportCatalog.test.ts` |
-| `items: [ … ]` (tuple / legacy tuple form) | rejected | Throws: tuple-style `items` not supported | `supportCatalog.test.ts`; bead `jsonschema-form-a58` |
-| `items: true` / `items: false` | rejected | Throws | `supportCatalog.test.ts` |
+| `items` omitted | rejected | Throws: must have `items` | `errorHandling.test.ts` |
+| `items: [ … ]` (tuple / legacy tuple form) | rejected | Throws: tuple-style `items` not supported | `errorHandling.test.ts`; bead `jsonschema-form-a58` |
+| `items: true` / `items: false` | rejected | Throws | `errorHandling.test.ts` |
 | `items.enum` or `items.oneOf` with `const` | supported | Container collapses to one leaf: `checkboxes` or `multiselect` | `parser.test.ts`, `containerFacts.test.ts`, ADR 030 §3 |
 | `items` primitive, no finite choices | supported | `ArrayNode` with add/remove; each item is scalar `input` | `deepNesting.test.ts`, `arraysRobustness.test.ts` |
 | `items.type: 'object'` + `properties` | supported | `ArrayNode`; each item is nested `GroupNode` | `parser.test.ts` |
@@ -114,7 +114,7 @@ Threshold: `OPTION_COUNT_THRESHOLD` in `packages/core/src/present/present.ts` (b
 | `maxItems` | supported | `constraints.maxItems` on container / collapsed leaf | `parser.test.ts` |
 | `uniqueItems` | ignored | Not copied to `facts.constraints` | `compile.ts` `buildValidation` |
 | `contains` | ignored | Draft-07 array assertion; not read in `compileArray` | `compile.ts` (absence) |
-| `additionalItems` | ignored | Tuple `items: [...]` rejected before this keyword applies | `supportCatalog.test.ts` |
+| `additionalItems` | ignored | Tuple `items: [...]` rejected before this keyword applies | `errorHandling.test.ts` |
 | `prefixItems` | ignored | JSON Schema 2020-12; not read (distinct from rejected tuple `items: [...]` above) | bead `jsonschema-form-a58` |
 
 **Submit behavior (native `form.submit`)** — array-valued leaves always submit as JSON arrays; empty multiselect omitted from payload (`parser.test.ts`). Checkbox groups do not set HTML `required` for “at least one” (`present.test.ts`); use side-loaded validation.
@@ -235,11 +235,11 @@ Internal modules (`compile.ts`, `resolveRefs.ts`) are not public API.
 | Structural compile | `src/compile.ts` | `parser.test.ts` |
 | `$ref` | `src/resolveRefs.ts` | `parser.test.ts` (`$ref / $defs`) |
 | Default widgets | `packages/core/src/present/present.ts` | `present.test.ts`, `containerFacts.test.ts` |
-| Combinators / gaps | `compile.ts` (absence) | `supportCatalog.test.ts` |
+| Combinators / gaps | `compile.ts` (absence) | `edgeSchemas.test.ts`, `errorHandling.test.ts` |
 | Edge cases | — | `edgeSchemas.test.ts`, `errorHandling.test.ts` |
 | Arrays / submit | `packages/core` submit utils | `arraysRobustness.test.ts`, `parser.test.ts` (submit) |
 
-When changing behavior, update **this file** and the matching test in `supportCatalog.test.ts` or an existing suite.
+When changing behavior, update **this file** and the relevant capability test in an existing suite (`edgeSchemas.test.ts`, `errorHandling.test.ts`, `parser.test.ts`, etc.).
 
 ---
 
@@ -261,7 +261,7 @@ Actionable unsupported areas are tracked in **bd**. This catalog links them for 
 
 ## Corrections vs common assumptions
 
-- **`anyOf` is not supported as a variant subform.** The combinator is an **ignored** modifier; the property compiles from its resolved subschema (plain string input when `type` is absent) (`supportCatalog.test.ts`).
+- **`anyOf` is not supported as a variant subform.** The combinator is an **ignored** modifier; the property compiles from its resolved subschema (plain string input when `type` is absent) (`edgeSchemas.test.ts`).
 - **`oneOf` is not general union typing.** Only `{ const, title? }` branches become choices; `{ type: 'string' } | { type: 'number' }` yields an empty radio group.
 - **`allOf` does not merge.** Constraint keywords on `allOf` branches are not applied.
 - **`packages/core/README.md` schema-resolution list is stale.** Resolution lives in `@jsonschema-form/input-jsonschema` and is limited to local `$ref` (ADR 033).
