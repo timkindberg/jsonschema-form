@@ -290,11 +290,165 @@ describe('zodToTree', () => {
   })
 
   describe('origin', () => {
-    it('pins origin.source to "zod" and carries the declared schema', () => {
-      const form = zodToTree(z.object({ name: z.string() }))
+    it('pins origin.source to "zod" and the declared property schema reference', () => {
+      const name = z.string()
+      const form = zodToTree(z.object({ name }))
       const field = form.getField('name')
       expect(field?.facts.origin.source).toBe('zod')
-      expect(field?.facts.origin.schema).toBeDefined()
+      expect(field?.facts.origin.schema).toBe(name)
+    })
+  })
+
+  describe('degraded unions', () => {
+    it('non-literal and discriminated unions degrade to plain string input without choices', () => {
+      const plain = zodToTree(
+        z.object({ mode: z.union([z.string(), z.number()]) })
+      )
+      const disc = zodToTree(
+        z.object({
+          item: z.discriminatedUnion('type', [
+            z.object({ type: z.literal('a'), x: z.string() }),
+            z.object({ type: z.literal('b'), y: z.number() }),
+          ]),
+        })
+      )
+
+      for (const [form, key] of [
+        [plain, 'mode'],
+        [disc, 'item'],
+      ] as const) {
+        const field = form.getField(key)
+        expect(field?.widget).toBe('input')
+        expect(field?.facts.primitive).toBe('string')
+        expect(field?.facts.choices).toBeUndefined()
+      }
+      expect(inputCtl(plain.getField('mode')).attrs.type).toBe('text')
+    })
+
+    it('union with mixed literal types is not a choice set', () => {
+      const form = zodToTree(
+        z.object({ flag: z.union([z.literal('yes'), z.literal(true)]) })
+      )
+      const field = form.getField('flag')
+      expect(field?.widget).toBe('input')
+      expect(field?.facts.choices).toBeUndefined()
+    })
+  })
+
+  describe('degraded wrappers and composites', () => {
+    it('transform and pipe stop unwrapping at a plain string input', () => {
+      const transform = zodToTree(
+        z.object({ len: z.string().transform((s) => s.length) })
+      )
+      const pipe = zodToTree(
+        z.object({ n: z.string().pipe(z.coerce.number()) })
+      )
+
+      for (const [form, key] of [
+        [transform, 'len'],
+        [pipe, 'n'],
+      ] as const) {
+        const field = form.getField(key)
+        expect(field?.widget).toBe('input')
+        expect(field?.facts.primitive).toBe('string')
+        expect(field?.facts.choices).toBeUndefined()
+      }
+    })
+
+    it('tuple, lazy, and intersection fall back to plain string input', () => {
+      const form = zodToTree(
+        z.object({
+          pair: z.tuple([z.string(), z.number()]),
+          node: z.lazy(() => z.object({ name: z.string() })),
+          both: z.intersection(
+            z.object({ a: z.string() }),
+            z.object({ b: z.number() })
+          ),
+        })
+      )
+
+      for (const key of ['pair', 'node', 'both'] as const) {
+        expect(form.getField(key)?.widget).toBe('input')
+      }
+      expect(form.getField('node.name')).toBeUndefined()
+      expect(form.getField('pair')?.facts.valueShape).toBe('scalar')
+    })
+  })
+
+  describe('standalone literals', () => {
+    it('single literal scalars compile as plain inputs without choices', () => {
+      const form = zodToTree(
+        z.object({
+          fixed: z.literal('only'),
+          count: z.literal(42),
+          ok: z.literal(true),
+        })
+      )
+
+      const fixed = form.getField('fixed')
+      expect(fixed?.widget).toBe('input')
+      expect(fixed?.facts.primitive).toBe('string')
+      expect(fixed?.facts.choices).toBeUndefined()
+      expect(inputCtl(fixed).attrs.type).toBe('text')
+
+      const count = form.getField('count')
+      expect(count?.facts.primitive).toBe('number')
+      expect(count?.facts.choices).toBeUndefined()
+      expect(inputCtl(count).attrs.type).toBe('number')
+
+      const ok = form.getField('ok')
+      expect(ok?.facts.primitive).toBe('boolean')
+      expect(ok?.facts.choices).toBeUndefined()
+      expect(inputCtl(ok).attrs.type).toBe('checkbox')
+    })
+  })
+
+  describe('refinement and record degradation', () => {
+    it('refine preserves inner base constraints but not the predicate', () => {
+      const form = zodToTree(
+        z.object({
+          code: z
+            .string()
+            .min(5)
+            .refine((s) => s.includes('@')),
+        })
+      )
+      const field = form.getField('code')
+      expect(field?.facts.constraints.minLength).toBe(5)
+      expect(field?.widget).toBe('input')
+    })
+
+    it('record degrades to string input while preserving zod origin', () => {
+      const schema = z.record(z.string(), z.string())
+      const form = zodToTree(z.object({ meta: schema }))
+      const field = form.getField('meta')
+      expect(field?.widget).toBe('input')
+      expect(field?.facts.primitive).toBe('string')
+      expect(field?.facts.origin.source).toBe('zod')
+      expect(field?.facts.origin.schema).toBe(schema)
+    })
+  })
+
+  describe('wrapper semantics (defaults, prefault, catch)', () => {
+    it('default and prefault make keys optional without prefill attrs', () => {
+      const form = zodToTree(
+        z.object({
+          a: z.string().default('x'),
+          b: z.string().prefault('y'),
+        })
+      )
+
+      expect(form.getField('a')?.facts.constraints.required).toBe(false)
+      expect(form.getField('b')?.facts.constraints.required).toBe(false)
+      expect('value' in inputCtl(form.getField('a')).attrs).toBe(false)
+      expect('value' in inputCtl(form.getField('b')).attrs).toBe(false)
+    })
+
+    it('catch unwraps to inner facts but keeps the key required', () => {
+      const form = zodToTree(z.object({ label: z.string().catch('fallback') }))
+      const field = form.getField('label')
+      expect(field?.facts.constraints.required).toBe(true)
+      expect(field?.widget).toBe('input')
     })
   })
 })
