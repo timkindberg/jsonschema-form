@@ -23,6 +23,8 @@ export {
   createRenderer,
   defaultAdapter,
   diagnosticAdapter,
+  Default,
+  Children,
   ValidationProvider,
   useFieldErrors,
   useFieldErrorDisplay,
@@ -41,6 +43,7 @@ export { ValidationSummary } from './ValidationSummary'
 export type {
   SchemaFieldsProps,
   RenderNode,
+  RenderHelpers,
   ReactAdapter,
   ReactPartialAdapter,
   ENode,

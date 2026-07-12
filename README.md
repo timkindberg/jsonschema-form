@@ -36,6 +36,65 @@ See `CONTEXT.md` for the full glossary and `architecture_records/` for the decis
 
 Customization is one recursive primitive, available at any granularity, fractal from the whole form down to a single field part. The renderer walks the tree and calls `renderNode(node, { Default, Children })` per node; you re-enter the engine by mounting a handle — `<Default of={node} />`, `<Children of={node} />`, or a specific child `<Default of={node.children.x} />` — or override individual parts of a field with `<Default of={node} parts={{ partName: (part) => <JSX/> }} />`. At every node you have three moves: take the default whole, keep the default layout but swap a sub-piece, or place the sub-pieces yourself. You pay only for what you customize — the library renders the rest.
 
+`Default` and `Children` are injected into `renderNode` (and the root render-prop) and are also importable from the package root — use whichever is in scope:
+
+```tsx
+import { SchemaFields, Default, Children } from '@jsonschema-form/react'
+
+// 1. All defaults — no customization
+<SchemaFields form={tree} />
+
+// 2. Whole-node hijack — wrap a node, then re-enter its default
+<SchemaFields
+  form={tree}
+  renderNode={(node, { Default }) =>
+    node.isField ? (
+      <section>
+        <Default of={node} />
+      </section>
+    ) : (
+      <Default of={node} />
+    )
+  }
+/>
+
+// 3. Part override — keep the default layout, swap one piece
+<SchemaFields
+  form={tree}
+  renderNode={(node, { Default }) =>
+    node.isField && node.path === 'name' ? (
+      <Default
+        of={node}
+        parts={{
+          label: (label) => (
+            <>
+              <Default of={label} />
+              <span aria-hidden> (required)</span>
+            </>
+          ),
+        }}
+      />
+    ) : (
+      <Default of={node} />
+    )
+  }
+/>
+
+// 4. Subtree re-entry — hijack a container's layout, delegate its children
+<SchemaFields
+  form={tree}
+  renderNode={(node, { Default, Children }) =>
+    node.isGroup && node.path === 'address' ? (
+      <section>
+        <Children of={node} />
+      </section>
+    ) : (
+      <Default of={node} />
+    )
+  }
+/>
+```
+
 This is the RJSF-killer: the hard 20% is JSX, not schema sprawl. Full detail lives in [ADR 010](./architecture_records/010_recursive_continuation_rendering.md).
 
 ## Reference stack & swappability
