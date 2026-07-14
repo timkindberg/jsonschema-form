@@ -17,6 +17,7 @@ import type {
   ArrayNode,
   ChoiceOption,
   ContainerFacts,
+  ControlKind,
   FieldControl,
   FieldFacts,
   FieldNode,
@@ -29,6 +30,34 @@ import type {
   WidgetName,
 } from '../parser/nodeTypes'
 import { serializeNode } from '../parser/utils'
+
+// --- Stage B: the shared widget→control-kind table (ADR 041 §4) -----------------
+//
+// The SINGLE source of truth mapping each `WidgetName` to its render archetype
+// (`control.kind`). Both the runtime `deriveControl` (below) and the type-level
+// `WidgetToControlKind<W>` read this ONE const, so the runtime switch and the
+// path-narrowed control types cannot drift (ADR 041 §4, "zero drift" for Stage B).
+//
+// `satisfies Record<WidgetName, ControlKind>` is the exhaustiveness check: adding
+// a `WidgetName` without a mapping — or mapping one to a non-`ControlKind` — fails
+// to compile here, next to `deriveControl`, exactly where the fix belongs.
+export const WIDGET_CONTROL_KIND = {
+  input: 'input',
+  select: 'select',
+  multiselect: 'select',
+  textarea: 'textarea',
+  radio: 'choicegroup',
+  checkboxes: 'choicegroup',
+} as const satisfies Record<WidgetName, ControlKind>
+
+/**
+ * Type-level Stage B: the `control.kind` a widget resolves to, read from the same
+ * {@link WIDGET_CONTROL_KIND} const the runtime uses (ADR 041 §4). A path-narrowed
+ * control type routes through `WidgetToControlKind<WidgetAt<S, P, Overrides>>`
+ * (the `WidgetAt` seam lives in the front-end that owns schema shape).
+ */
+export type WidgetToControlKind<W extends WidgetName> =
+  (typeof WIDGET_CONTROL_KIND)[W]
 
 /** The normalized presentation for one field (ADR 029). `args` is the generic
  * per-widget config bag — named to avoid collision with a select's `options`. */
@@ -120,6 +149,28 @@ export function layered<S = unknown>(
       if (p) result = p
     }
     return result
+  }
+}
+
+/**
+ * A **typed per-path widget override** resolver (ADR 041 §4, bd 4bv). Turns a
+ * path→widget map into a `PresentationResolver` that assigns the mapped widget to
+ * each matching leaf and defers (`undefined`) everywhere else — layer it over the
+ * default: `layered(defaultPresentation, overrideWidgets(map))`.
+ *
+ * This is the RUNTIME half of the `WidgetAt<S, P, Overrides>` seam: the SAME map
+ * (as a `const`) is passed here to drive presentation and used as the `Overrides`
+ * type arg to `ControlAt`/`WidgetAt` (in the front-end) to re-narrow the control
+ * type — with no rewrite below (ADR 041 §4). Predicate/fact resolvers cannot be
+ * typed and stay runtime-guarded (`where(facts => …)` degrades to a union); this
+ * exact-path form is the one that carries a static type.
+ */
+export function overrideWidgets<S = unknown>(
+  map: Readonly<Record<string, WidgetName>>
+): PresentationResolver<S> {
+  return (facts) => {
+    const widget = map[facts.path]
+    return widget ? { widget } : undefined
   }
 }
 
@@ -248,26 +299,31 @@ export function deriveControl(
   f: FieldFacts,
   widget: string
 ): FieldControl | undefined {
+  // The `kind` on every arm below is taken from the shared `WIDGET_CONTROL_KIND`
+  // table — never a bare literal — so this switch and `WidgetToControlKind<W>`
+  // read the ONE source (ADR 041 §4). Each arm still builds the widget-specific
+  // attrs/options; only the archetype discriminant is table-driven.
+  const K = WIDGET_CONTROL_KIND
   switch (widget) {
     case 'input':
-      return { kind: 'input', attrs: inputAttrsFromFacts(f) }
+      return { kind: K.input, attrs: inputAttrsFromFacts(f) }
     case 'select':
       return {
-        kind: 'select',
+        kind: K.select,
         attrs: selectAttrsFromFacts(f, false),
         options: f.choices ?? [],
       }
     case 'multiselect':
       return {
-        kind: 'select',
+        kind: K.multiselect,
         attrs: selectAttrsFromFacts(f, true),
         options: f.choices ?? [],
       }
     case 'textarea':
-      return { kind: 'textarea', attrs: textareaAttrsFromFacts(f) }
+      return { kind: K.textarea, attrs: textareaAttrsFromFacts(f) }
     case 'radio':
       return {
-        kind: 'choicegroup',
+        kind: K.radio,
         multiple: false,
         role: 'radiogroup',
         labelledBy: captionId(f),
@@ -275,7 +331,7 @@ export function deriveControl(
       }
     case 'checkboxes':
       return {
-        kind: 'choicegroup',
+        kind: K.checkboxes,
         multiple: true,
         role: 'group',
         labelledBy: captionId(f),

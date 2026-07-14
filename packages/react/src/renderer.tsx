@@ -121,11 +121,13 @@ function DefaultDescription({ text }: { text: string }): ReactNode {
   return <small className="jsf-description">{text}</small>
 }
 
-/** When a field has errors, the root wraps its control in this provider. */
-interface FieldA11yState {
+/** When a field has errors, the root wraps its control in this provider.
+ * Exported so the customize layer (ADR 041) can re-establish the same
+ * control↔errors linkage when it places a movable `Control` part. */
+export interface FieldA11yState {
   errorId: string
 }
-const FieldA11yContext = createContext<FieldA11yState | null>(null)
+export const FieldA11yContext = createContext<FieldA11yState | null>(null)
 
 /**
  * The unified control renderer (ADR 029 §5, v60): ONE `field.control` slot that
