@@ -15,6 +15,7 @@ import App12 from './App_12_React+ReactHookForm'
 import App13 from './App_13_React+TouchedErrors'
 import App14 from './App_14_React+WidgetCatalog'
 import App15 from './App_15_React+ZodUseFormTree'
+import App16 from './App_16_React+Customize'
 
 const examples = [
   { id: '01', name: 'Core + Boilerplate', component: App01 },
@@ -44,6 +45,11 @@ const examples = [
     id: '15',
     name: 'React + Zod useFormTree (ADR 034/035)',
     component: App15,
+  },
+  {
+    id: '16',
+    name: 'React + Customize (ADR 041)',
+    component: App16,
   },
 ]
 

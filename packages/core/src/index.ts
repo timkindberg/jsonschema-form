@@ -66,8 +66,14 @@ export {
   deriveControl,
   deriveFieldParts,
   isContainerFacts,
+  overrideWidgets,
+  WIDGET_CONTROL_KIND,
 } from './present/present'
-export type { Presentation, PresentationResolver } from './present/present'
+export type {
+  Presentation,
+  PresentationResolver,
+  WidgetToControlKind,
+} from './present/present'
 
 // JSON Pointer ↔ tree dot-path helpers (ADR 018) — shared with validation
 // adapters and the JSON Schema front-end (its $ref resolver).

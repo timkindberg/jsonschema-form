@@ -5,6 +5,17 @@
  * Unsupported keywords and schema shapes degrade to `unknown` rather than erroring.
  */
 
+import type {
+  ArrayNode,
+  FieldControl,
+  FieldNode,
+  FieldPartsBase,
+  GroupNode,
+  ValidationError,
+  WidgetName,
+  WidgetToControlKind,
+} from '@formframe/core'
+
 /** Maximum nesting depth for {@link FieldPath} dot-path expansion. */
 type FieldPathDepthLimit = 5
 
@@ -114,3 +125,174 @@ export type InferData<S> = InferSchemaData<S>
  * Recursion is bounded by {@link FieldPathDepthLimit}.
  */
 export type FieldPath<S> = FieldPathFromSchema<S>
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Path-narrowed presentation types (ADR 041 §4)
+//
+// The schema-owning half of the customize narrowing: for a dot-path `P` in a
+// const schema `S`, resolve the sub-schema, its node kind, its value, and — via
+// the shared Stage B table in Core — its control archetype and present part set.
+// Framework-agnostic (Core-only deps): a React binding maps these DATA payloads
+// onto the `parts` component slots; nothing here imports a framework.
+//
+// The types are kept honest against the runtime `present()` pipeline by the
+// paired type-level + runtime conformance tests (infer.control.test.ts), the
+// "bounded drift" strategy for Stage A (ADR 041 §4).
+// ═══════════════════════════════════════════════════════════════════════════
+
+type PropsOf<S> = S extends { readonly properties: infer Q } ? Q : never
+
+/** The sub-schema at a dot-path `P` within schema `S` (JIT: resolves per-`P`). A
+ * `${number}` segment descends through `items`; anything unresolved is `unknown`. */
+export type SchemaAt<
+  S,
+  P extends string,
+> = P extends `${infer Head}.${infer Rest}`
+  ? Head extends keyof PropsOf<S>
+    ? SchemaAt<PropsOf<S>[Head], Rest>
+    : Head extends `${number}`
+      ? S extends { readonly items: infer I }
+        ? SchemaAt<I, Rest>
+        : unknown
+      : unknown
+  : P extends keyof PropsOf<S>
+    ? PropsOf<S>[P]
+    : P extends `${number}`
+      ? S extends { readonly items: infer I }
+        ? I
+        : unknown
+      : unknown
+
+/** Classify a sub-schema's node kind (object/array/leaf) — the runtime `nodeType`
+ * for the common cases. (Scalar-choice arrays that Core collapses to one leaf are
+ * an edge the default rule handles at runtime; this mirrors the structural kind.) */
+export type KindOf<S> = S extends { readonly type: 'object' }
+  ? 'group'
+  : S extends { readonly properties: unknown }
+    ? 'group'
+    : S extends { readonly type: 'array' }
+      ? 'array'
+      : 'field'
+
+type AllPaths<S> = FieldPath<S> & string
+
+/** Leaf (field) paths of `S` — reject a group/array path at compile time. */
+export type FieldPaths<S> = {
+  [P in AllPaths<S>]: KindOf<SchemaAt<S, P>> extends 'field' ? P : never
+}[AllPaths<S>]
+
+/** Object (group) paths of `S`. */
+export type GroupPaths<S> = {
+  [P in AllPaths<S>]: KindOf<SchemaAt<S, P>> extends 'group' ? P : never
+}[AllPaths<S>]
+
+/** Array paths of `S`. */
+export type ArrayPaths<S> = {
+  [P in AllPaths<S>]: KindOf<SchemaAt<S, P>> extends 'array' ? P : never
+}[AllPaths<S>]
+
+/** The value type at a path (the form-state boundary). */
+export type ValueAt<S, P extends string> = InferData<SchemaAt<S, P>>
+
+/** The enriched-node type at a path, kind-narrowed off the schema. */
+export type NodeAt<S, P extends string> =
+  KindOf<SchemaAt<S, P>> extends 'group'
+    ? GroupNode<SchemaAt<S, P>>
+    : KindOf<SchemaAt<S, P>> extends 'array'
+      ? ArrayNode<SchemaAt<S, P>>
+      : FieldNode<SchemaAt<S, P>>
+
+// --- Stage A: facts→widget, mirroring `defaultPresentation` (bounded drift) -----
+// A choice field splits on Core's `OPTION_COUNT_THRESHOLD` (5): ≤5 → radio, else
+// select. Both sides map to DIFFERENT control kinds, so the count is load-bearing.
+type AtMost5<T extends readonly unknown[]> = T extends readonly [
+  unknown,
+  unknown,
+  unknown,
+  unknown,
+  unknown,
+  unknown,
+  ...unknown[],
+]
+  ? false
+  : true
+type EnumOf<S> = S extends { readonly enum: infer E extends readonly unknown[] }
+  ? E
+  : never
+
+/** The DEFAULT widget a path resolves to (Stage A) — mirrors `defaultPresentation`
+ * for the scalar cases the const schema can express (enum → radio/select by count;
+ * otherwise a plain input). Kept honest by gate conformance (ADR 041 §4). */
+export type DefaultWidgetAt<S, P extends string> =
+  SchemaAt<S, P> extends {
+    readonly enum: readonly unknown[]
+  }
+    ? AtMost5<EnumOf<SchemaAt<S, P>>> extends true
+      ? 'radio'
+      : 'select'
+    : 'input'
+
+/** No-overrides marker: `Record<never, WidgetName>` = an empty override map, so
+ * `WidgetAt` is pure default rule today (ADR 041 §4, `Overrides = {}`). */
+export type NoOverrides = Record<never, WidgetName>
+
+/**
+ * The forward-compat seam (ADR 041 §4): the widget at `P` is the consumer's
+ * `Overrides[P]` when present, else the default rule. Today `Overrides` defaults
+ * to empty, so this is pure default-rule fidelity; a typed per-path resolver
+ * later supplies an `Overrides` map and the control type re-narrows with NO
+ * change below (bd 4bv builds on this seam).
+ */
+export type WidgetAt<
+  S,
+  P extends string,
+  Overrides extends Record<string, WidgetName> = NoOverrides,
+> = P extends keyof Overrides ? Overrides[P] : DefaultWidgetAt<S, P>
+
+/** The control archetype at a path — routed through the shared Stage B table. */
+export type ControlKindAt<
+  S,
+  P extends string,
+  Overrides extends Record<string, WidgetName> = NoOverrides,
+> = WidgetToControlKind<WidgetAt<S, P, Overrides>>
+
+/** The pre-narrowed `FieldControl` union member at a path — so `control.attrs`
+ * is the right shape with no runtime `kind` guard (ADR 041 §4/§5). */
+export type ControlAt<
+  S,
+  P extends string,
+  Overrides extends Record<string, WidgetName> = NoOverrides,
+> = Extract<FieldControl, { kind: ControlKindAt<S, P, Overrides> }>
+
+/** Whether the sub-schema at `P` declares a description (part presence). */
+export type HasDescription<S, P extends string> =
+  SchemaAt<S, P> extends {
+    readonly description: string
+  }
+    ? true
+    : false
+
+// The narrowed DATA payload each present part hands its render prop. Core owns
+// these shapes; a React binding wraps each as a `PartSlot<data>`.
+type LabelData = FieldPartsBase['label']
+type TextData = NonNullable<FieldPartsBase['description']>
+
+/**
+ * The parts bag DERIVED per field path (ADR 041 §4): `Description` exists only
+ * when the schema declares one; `Control` is the pre-narrowed member for the
+ * path's widget. `Errors` is runtime validation state (`ValidationError[]`).
+ */
+export type FieldPartsFor<
+  S,
+  P extends string,
+  Overrides extends Record<string, WidgetName> = NoOverrides,
+> = {
+  Label: LabelData
+  Control: ControlAt<S, P, Overrides>
+  Errors: ValidationError[]
+} & (HasDescription<S, P> extends true ? { Description: TextData } : object)
+
+/** The parts bag for a group/array path (captions only). */
+export type GroupPartsFor<S, P extends string> = {
+  Label: TextData
+} & (HasDescription<S, P> extends true ? { Description: TextData } : object)

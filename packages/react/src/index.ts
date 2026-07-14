@@ -52,3 +52,24 @@ export type {
   EArray,
   EArrayItem,
 } from './renderer'
+
+// The customize layer (ADR 041) — a form-scope selector registry lowering to
+// an ordinary `RenderNode` (no engine seam); handlers are mounted components
+// receiving arrangeable parts. Source-agnostic; front-ends narrow the surface.
+export { customize } from './customize'
+export type {
+  CustomizeRegistrar,
+  CustomizeBuild,
+  PartSlot,
+  PartsBag,
+  LabelData,
+  TextData,
+  FieldHandler,
+  GroupHandler,
+  ArrayHandler,
+  NodeHandler,
+  FieldHandlerProps,
+  GroupHandlerProps,
+  ArrayHandlerProps,
+  NodeHandlerProps,
+} from './customize'

@@ -11,3 +11,23 @@ export const VERSION = '0.0.0'
 export { jsonSchemaToTree } from './jsonSchemaToTree'
 export type { JSONSchema, JSONSchemaObject } from './types'
 export type { InferData, FieldPath } from './infer'
+// Path-narrowed presentation types (ADR 041 §4) — the schema-owning half of the
+// customize narrowing. Framework-agnostic; a React binding maps `*PartsFor` DATA
+// payloads onto the customize `parts` slots.
+export type {
+  SchemaAt,
+  KindOf,
+  FieldPaths,
+  GroupPaths,
+  ArrayPaths,
+  ValueAt,
+  NodeAt,
+  DefaultWidgetAt,
+  WidgetAt,
+  NoOverrides,
+  ControlKindAt,
+  ControlAt,
+  HasDescription,
+  FieldPartsFor,
+  GroupPartsFor,
+} from './infer'
