@@ -253,15 +253,14 @@ function ValidationCountingHarness({
   Counting: ReturnType<typeof createRenderer>
 }) {
   const validator = useMemo(() => createAjvValidator(validationSchema), [])
-  const { form, revalidate, store } = useFormTree(validationTree, {
-    validator,
-    // This suite is about error-store fan-out (ADR 023/037), not the touched
-    // display policy (ADR 027) — report immediately so a new error renders.
-    showErrorsWhen: 'always',
-  })
+  const { form, revalidate, store } = useFormTree(validationTree, { validator })
   return (
     <form noValidate onChange={revalidate}>
-      <FormStoreProvider store={store}>
+      {/* This suite is about error-store fan-out (ADR 023/037), not the touched
+          display policy (ADR 027). The custom `Counting` renderer reads the store
+          through FormStoreProvider, so the policy is set here — report
+          immediately so a new error renders. */}
+      <FormStoreProvider store={store} showErrorsWhen="always">
         <Counting form={form} />
       </FormStoreProvider>
     </form>
@@ -321,11 +320,10 @@ function TouchedCountingHarness({
   const validator = useMemo(() => createAjvValidator(touchedGateSchema), [])
   const { form, revalidate, handleBlur, store } = useFormTree(touchedGateTree, {
     validator,
-    showErrorsWhen: 'touched',
   })
   return (
     <form noValidate onInput={revalidate} onBlur={handleBlur}>
-      <FormStoreProvider store={store}>
+      <FormStoreProvider store={store} showErrorsWhen="touched">
         <Counting form={form} />
       </FormStoreProvider>
     </form>
