@@ -53,12 +53,18 @@ const baseSchema = z.object({
   email: z.string().email('Enter a valid email').meta({ title: 'Email' }),
 })
 
-// The validator schema adds the async, remote rule; the tree is compiled from
-// the base object so it is a plain, synchronously-structured form.
-const validatorSchema = baseSchema.refine(
-  (data) => isUsernameAvailable(data.username),
-  { message: 'That username is already taken', path: ['username'] }
-)
+// The validator schema layers the async remote rule onto the *username field*
+// (not the whole object) so the check runs as soon as the username itself is
+// valid — independent of the email field. An object-level refine would only run
+// after every field passes, so the remote check wouldn't fire until email was
+// valid too. The tree is still compiled from the plain base object below, so it
+// stays a synchronously-structured form.
+const validatorSchema = baseSchema.extend({
+  username: baseSchema.shape.username.refine(
+    (value) => isUsernameAvailable(value),
+    'That username is already taken'
+  ),
+})
 
 const tree = zodToTree(baseSchema)
 
@@ -129,9 +135,9 @@ function App() {
             await new Promise((r) => setTimeout(r, 800))
             setSaved(data)
           })}
-          // Validate on blur (native change for text): one remote check per field
-          // visit, not per keystroke. Debounced per-keystroke is consumer-owned.
-          onChange={revalidate}
+          // Validate on blur (focusout bubbles): one remote check per field
+          // visit, not per keystroke. Per-keystroke debounced checks are
+          // consumer-owned — wire revalidate to onChange with your own debounce.
           onBlur={(e) => {
             handleBlur(e)
             revalidate(e)
