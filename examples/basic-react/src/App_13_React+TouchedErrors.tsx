@@ -13,11 +13,7 @@
 // form (focusout bubbles, so a single handler covers every field) and spread its
 // complete validation capability into `ValidationProvider`.
 import { useMemo, useState } from 'react'
-import {
-  useFormTree,
-  ValidationProvider,
-  type ShowErrorsWhen,
-} from '@formframe/renderer-react'
+import { useFormTree, type ShowErrorsWhen } from '@formframe/renderer-react'
 import { createAjvValidator } from '@formframe/validation-ajv'
 import { jsonSchemaToTree } from '@formframe/input-jsonschema'
 import type { JSONSchema } from '@formframe/input-jsonschema'
@@ -46,9 +42,10 @@ const policies: ShowErrorsWhen[] = ['always', 'touched', 'submit']
 
 function App() {
   const validator = useMemo(() => createAjvValidator(schema), [])
-  const { SchemaFields, submit, revalidate, handleBlur, validation } =
-    useFormTree(tree, { validator })
   const [mode, setMode] = useState<ShowErrorsWhen>('touched')
+  const { SchemaFields, submit, revalidate, handleBlur } = useFormTree(tree, {
+    validator,
+  })
   const [submittedData, setSubmittedData] = useState<Record<
     string,
     unknown
@@ -93,9 +90,9 @@ function App() {
           revalidate(e)
         }}
       >
-        <ValidationProvider {...validation} showErrorsWhen={mode}>
-          <SchemaFields />
-        </ValidationProvider>
+        {/* `showErrorsWhen` is reactive: toggling the policy re-reveals
+            accordingly, without recreating the store or remounting the inputs. */}
+        <SchemaFields showErrorsWhen={mode} />
         <button type="submit">Submit</button>
       </form>
 

@@ -5,7 +5,7 @@
 // 3. Adapt validation explicitly with fromStandardSchema(schema).
 // 4. Bind with useFormTree(tree, { validator }).
 // 5. Submit through the hook's submit callback — not GroupNode/form.submit.
-// 6. Spread validation into ValidationProvider for Summary + field errors.
+// 6. Wrap in FormStoreProvider so the Summary + field errors read the store.
 // 7. One continuation customization; everything else stays default.
 import { useState } from 'react'
 import { z } from 'zod'
@@ -13,7 +13,8 @@ import { fromStandardSchema } from '@formframe/core'
 import { zodToTree } from '@formframe/input-zod'
 import {
   useFormTree,
-  ValidationProvider,
+  FormStoreProvider,
+  SchemaFields,
   ValidationSummary,
 } from '@formframe/renderer-react'
 
@@ -29,8 +30,9 @@ const tree = zodToTree(schema)
 const validator = fromStandardSchema(schema)
 
 function App() {
-  const { SchemaFields, submit, revalidate, handleBlur, validation } =
-    useFormTree(tree, { validator })
+  const { form, submit, revalidate, handleBlur, store } = useFormTree(tree, {
+    validator,
+  })
   const [saved, setSaved] = useState<Record<string, unknown> | null>(null)
 
   return (
@@ -40,9 +42,8 @@ function App() {
         <code>zodToTree(schema)</code> compiles structure;{' '}
         <code>fromStandardSchema(schema)</code> adapts validation;{' '}
         <code>useFormTree(tree, {'{ validator }'})</code> binds React behavior.
-        Spread <code>{'{...validation}'}</code> into{' '}
-        <code>ValidationProvider</code> — errors, touched, and submitted state
-        travel together (ADR 036).
+        Wrap the content in <code>FormStoreProvider</code> — errors, touched,
+        submitted, and pending state all read from the hook&apos;s store.
       </p>
       <p>
         The email field below shows one continuation move: augment the label
@@ -57,9 +58,10 @@ function App() {
           revalidate(event)
         }}
       >
-        <ValidationProvider {...validation}>
+        <FormStoreProvider store={store}>
           <ValidationSummary />
           <SchemaFields
+            form={form}
             renderNode={(node, { Default }) =>
               node.isField && node.path === 'email' ? (
                 <Default
@@ -86,7 +88,7 @@ function App() {
               )
             }
           />
-        </ValidationProvider>
+        </FormStoreProvider>
         <button type="submit">Save profile</button>
       </form>
 

@@ -16,7 +16,7 @@ import { createAjvValidator } from '@formframe/validation-ajv'
 import {
   createRenderer,
   defaultAdapter,
-  ValidationProvider,
+  FormStoreProvider,
   fieldControlId,
   fieldErrorId,
   type ReactPartialAdapter,
@@ -253,16 +253,17 @@ function ValidationCountingHarness({
   Counting: ReturnType<typeof createRenderer>
 }) {
   const validator = useMemo(() => createAjvValidator(validationSchema), [])
-  const { form, revalidate, validation } = useFormTree(validationTree, {
+  const { form, revalidate, store } = useFormTree(validationTree, {
     validator,
+    // This suite is about error-store fan-out (ADR 023/037), not the touched
+    // display policy (ADR 027) — report immediately so a new error renders.
+    showErrorsWhen: 'always',
   })
-  // This suite is about error-store fan-out (ADR 023/037), not the touched display
-  // policy (ADR 027) — report immediately so a new error renders on change.
   return (
     <form noValidate onChange={revalidate}>
-      <ValidationProvider {...validation} showErrorsWhen="always">
+      <FormStoreProvider store={store}>
         <Counting form={form} />
-      </ValidationProvider>
+      </FormStoreProvider>
     </form>
   )
 }
@@ -318,15 +319,15 @@ function TouchedCountingHarness({
   Counting: ReturnType<typeof createRenderer>
 }) {
   const validator = useMemo(() => createAjvValidator(touchedGateSchema), [])
-  const { form, revalidate, handleBlur, validation } = useFormTree(
-    touchedGateTree,
-    { validator }
-  )
+  const { form, revalidate, handleBlur, store } = useFormTree(touchedGateTree, {
+    validator,
+    showErrorsWhen: 'touched',
+  })
   return (
     <form noValidate onInput={revalidate} onBlur={handleBlur}>
-      <ValidationProvider {...validation} showErrorsWhen="touched">
+      <FormStoreProvider store={store}>
         <Counting form={form} />
-      </ValidationProvider>
+      </FormStoreProvider>
     </form>
   )
 }

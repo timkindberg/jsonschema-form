@@ -8,8 +8,10 @@
 import { useMemo, useState } from 'react'
 import {
   useFormTree,
-  ValidationProvider,
+  FormStoreProvider,
+  SchemaFields,
   ValidationSummary,
+  useValidationErrors,
 } from '@formframe/renderer-react'
 import { createAjvValidator } from '@formframe/validation-ajv'
 import { jsonSchemaToTree } from '@formframe/input-jsonschema'
@@ -41,12 +43,23 @@ const schema = {
 } as const satisfies JSONSchema
 const tree = jsonSchemaToTree(schema)
 
+/** A footer count that reads errors from the store, fan-out-free. */
+function ErrorFooter() {
+  const errors = useValidationErrors()
+  if (errors.length === 0) return null
+  return (
+    <p style={{ color: 'crimson' }}>
+      {errors.length} error(s) — see the fields above.
+    </p>
+  )
+}
+
 function App() {
   // Compile the schema once; the validator is the side-loaded slot.
   const validator = useMemo(() => createAjvValidator(schema), [])
-  // The complete validation capability carries errors, touched paths, and the
-  // submit flag required by the default touched-gated display policy.
-  const { SchemaFields, submit, validation } = useFormTree(tree, { validator })
+  // The hook owns the form store; wrap the content in FormStoreProvider so the
+  // summary + fields all read errors/touched/submitted from it.
+  const { form, submit, store } = useFormTree(tree, { validator })
   const [submitted, setSubmitted] = useState<Record<string, unknown> | null>(
     null
   )
@@ -75,19 +88,15 @@ function App() {
         have errors.
       </p>
 
-      <form noValidate onSubmit={submit(handleValid)}>
-        <ValidationProvider {...validation}>
+      <FormStoreProvider store={store}>
+        <form noValidate onSubmit={submit(handleValid)}>
           <ValidationSummary />
-          <SchemaFields />
-        </ValidationProvider>
-        <button type="submit">Submit</button>
-      </form>
+          <SchemaFields form={form} />
+          <button type="submit">Submit</button>
+        </form>
+        <ErrorFooter />
+      </FormStoreProvider>
 
-      {validation.errors.length > 0 && (
-        <p style={{ color: 'crimson' }}>
-          {validation.errors.length} error(s) — see the fields above.
-        </p>
-      )}
       {submitted && (
         <>
           <p style={{ color: 'green' }}>Submitted valid data:</p>

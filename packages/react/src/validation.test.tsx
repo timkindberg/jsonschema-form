@@ -14,7 +14,6 @@ import { jsonSchemaToTree } from '@formframe/input-jsonschema'
 import type { JSONSchema } from '@formframe/input-jsonschema'
 import { createAjvValidator } from '@formframe/validation-ajv'
 import { useFormTree } from './useFormTree'
-import { ValidationProvider } from './renderer'
 
 const schema = {
   type: 'object',
@@ -32,20 +31,19 @@ function Harness({
   onValid: (data: Record<string, unknown>) => void
 }) {
   const validator = useMemo(() => createAjvValidator(schema), [])
-  const { SchemaFields, submit, validation } = useFormTree(tree, {
+  const { SchemaFields, submit } = useFormTree(tree, {
     validator,
   })
   // `noValidate`: the schema renders native `required`/`pattern` attrs (ADR 012),
   // which would otherwise block submit before our JS validator runs. Opt out so
   // the side-loaded validator owns the UX.
   //
-  // The default display policy is `'touched'` (ADR 027), so the hook's complete
-  // validation capability must carry the submit attempt that reveals errors.
+  // The default display policy is `'touched'` (ADR 027); the bound `SchemaFields`
+  // auto-provides the form store, so the submit attempt that reveals errors is
+  // carried without any manual provider wiring.
   return (
     <form noValidate onSubmit={submit(onValid)}>
-      <ValidationProvider {...validation}>
-        <SchemaFields />
-      </ValidationProvider>
+      <SchemaFields />
       <button type="submit">Submit</button>
     </form>
   )

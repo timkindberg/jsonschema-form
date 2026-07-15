@@ -44,6 +44,8 @@ import {
 } from 'react'
 import { createErrorStore, EMPTY_ERRORS, type ErrorStore } from './errorStore'
 import { createTouchedStore, type TouchedStore } from './touchedStore'
+import { createStatusStore, type StatusStore } from './statusStore'
+import type { FormStore } from './formStore'
 import {
   shouldDisplayFieldErrors,
   DEFAULT_SHOW_ERRORS_WHEN,
@@ -207,6 +209,10 @@ function DefaultGroupLabel({ text }: { text: string }): ReactNode {
 
 const ValidationStoreContext = createContext<ErrorStore | null>(null)
 
+/** Form-scope status store (ADR 044): isValidating / isSubmitting / failure.
+ * Null (no provider) → the selector hooks report the dormant defaults. */
+const StatusStoreContext = createContext<StatusStore | null>(null)
+
 /** The touched store + chosen display policy (ADR 027) for the fields below.
  * Null (no provider) means no gating — a field always shows whatever errors it
  * has, exactly as before ADR 027. */
@@ -249,6 +255,11 @@ export function ValidationProvider({
   // once and stays referentially stable across renders (no ref-in-render).
   const [store] = useState(() => createErrorStore(errors))
   const [touchedStore] = useState(() => createTouchedStore(touched, submitted))
+  // A dormant status store: this data-driven provider carries no live pending /
+  // failure signals (those come from the orchestrating form store), but it still
+  // supplies the context so `useIsValidating`/etc. read `false`/`null` rather
+  // than reaching a bare Context default.
+  const [statusStore] = useState(() => createStatusStore())
   // Push new state into the stores after commit (never during render). Each
   // store preserves per-path identity for unchanged paths, so this notifies only
   // the fields that actually changed.
@@ -264,9 +275,44 @@ export function ValidationProvider({
   )
   return (
     <ValidationStoreContext.Provider value={store}>
-      <DisplayPolicyContext.Provider value={policy}>
-        {children}
-      </DisplayPolicyContext.Provider>
+      <StatusStoreContext.Provider value={statusStore}>
+        <DisplayPolicyContext.Provider value={policy}>
+          {children}
+        </DisplayPolicyContext.Provider>
+      </StatusStoreContext.Provider>
+    </ValidationStoreContext.Provider>
+  )
+}
+
+/**
+ * Inject an existing {@link FormStore}'s sub-stores into the field contexts — the
+ * native path used by the `SchemaFields` returned from `useFormTree`. Unlike the
+ * data-driven {@link ValidationProvider}, this creates and syncs nothing: the
+ * hook already owns the stores and writes to them directly (no top-level state,
+ * so a validation pass re-renders no wrapper — only the subscribed fields). Also
+ * exported for advanced composition over a hand-built store.
+ */
+export function FormStoreProvider({
+  store,
+  showErrorsWhen = DEFAULT_SHOW_ERRORS_WHEN,
+  children,
+}: {
+  store: FormStore
+  /** Error-display policy (ADR 027). Reactive: change it to switch modes live. */
+  showErrorsWhen?: ShowErrorsWhen
+  children: ReactNode
+}): ReactNode {
+  const policy = useMemo<DisplayPolicy>(
+    () => ({ store: store.touched, mode: showErrorsWhen }),
+    [store, showErrorsWhen]
+  )
+  return (
+    <ValidationStoreContext.Provider value={store.errors}>
+      <StatusStoreContext.Provider value={store.status}>
+        <DisplayPolicyContext.Provider value={policy}>
+          {children}
+        </DisplayPolicyContext.Provider>
+      </StatusStoreContext.Provider>
     </ValidationStoreContext.Provider>
   )
 }
@@ -296,6 +342,50 @@ export function useValidationErrors(): ValidationError[] {
     store ? store.subscribe : NEVER_SUBSCRIBE,
     store ? store.getAll : getEmptyErrors,
     store ? store.getAll : getEmptyErrors
+  )
+}
+
+const getFalse = () => false
+const getNull = () => null
+
+/**
+ * Whether a validation verdict is currently being computed (ADR 044) — any
+ * origin (submit or live). Subscribes to only the form-scope status signal, so a
+ * pending flip re-renders only the components that read it. No provider → `false`.
+ */
+export function useIsValidating(): boolean {
+  const store = useContext(StatusStoreContext)
+  return useSyncExternalStore(
+    store ? store.subscribe : NEVER_SUBSCRIBE,
+    store ? store.isValidating : getFalse,
+    store ? store.isValidating : getFalse
+  )
+}
+
+/**
+ * Whether a submit is in flight (ADR 043) — spans its (possibly async) `onValid`.
+ * Fan-out-free like {@link useIsValidating}. No provider → `false`.
+ */
+export function useIsSubmitting(): boolean {
+  const store = useContext(StatusStoreContext)
+  return useSyncExternalStore(
+    store ? store.subscribe : NEVER_SUBSCRIBE,
+    store ? store.isSubmitting : getFalse,
+    store ? store.isSubmitting : getFalse
+  )
+}
+
+/**
+ * The raw reason of the last authoritative validation-run failure (a thrown /
+ * rejected validator), or `null` (ADR 042). Distinct from an invalid verdict:
+ * errors are retained and this carries the exception. No provider → `null`.
+ */
+export function useValidationFailure(): unknown {
+  const store = useContext(StatusStoreContext)
+  return useSyncExternalStore(
+    store ? store.subscribe : NEVER_SUBSCRIBE,
+    store ? store.getFailure : getNull,
+    store ? store.getFailure : getNull
   )
 }
 
