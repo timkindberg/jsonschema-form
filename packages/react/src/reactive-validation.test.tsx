@@ -17,7 +17,7 @@ import { jsonSchemaToTree } from '@formframe/input-jsonschema'
 import type { JSONSchema } from '@formframe/input-jsonschema'
 import { createAjvValidator } from '@formframe/validation-ajv'
 import { useFormTree } from './useFormTree'
-import { ValidationProvider, fieldControlId, fieldErrorId } from './renderer'
+import { fieldControlId, fieldErrorId } from './renderer'
 
 const schema: JSONSchema = {
   type: 'object',
@@ -31,40 +31,39 @@ const tree = jsonSchemaToTree(schema)
 
 function InputHarness() {
   const validator = useMemo(() => createAjvValidator(schema), [])
-  const { SchemaFields, revalidate, validation } = useFormTree(tree, {
+  const { SchemaFields, revalidate } = useFormTree(tree, {
     validator,
+    showErrorsWhen: 'always',
   })
   return (
     <form noValidate onInput={revalidate}>
-      <ValidationProvider {...validation} showErrorsWhen="always">
-        <SchemaFields />
-      </ValidationProvider>
+      <SchemaFields />
     </form>
   )
 }
 
 function ChangeHarness() {
   const validator = useMemo(() => createAjvValidator(schema), [])
-  const { SchemaFields, revalidate, validation } = useFormTree(tree, {
+  const { SchemaFields, revalidate } = useFormTree(tree, {
     validator,
+    showErrorsWhen: 'always',
   })
   return (
     <form noValidate onChange={revalidate}>
-      <ValidationProvider {...validation} showErrorsWhen="always">
-        <SchemaFields />
-      </ValidationProvider>
+      <SchemaFields />
     </form>
   )
 }
 
 function SubmitOnlyHarness() {
   const validator = useMemo(() => createAjvValidator(schema), [])
-  const { SchemaFields, submit, validation } = useFormTree(tree, { validator })
+  const { SchemaFields, submit } = useFormTree(tree, {
+    validator,
+    showErrorsWhen: 'always',
+  })
   return (
     <form noValidate onSubmit={submit(() => {})}>
-      <ValidationProvider {...validation} showErrorsWhen="always">
-        <SchemaFields />
-      </ValidationProvider>
+      <SchemaFields />
       <button type="submit">Submit</button>
     </form>
   )
@@ -173,14 +172,13 @@ describe('reactive validation (ADR 021)', () => {
 
     function Harness() {
       const validator = useMemo(() => createAjvValidator(handleSchema), [])
-      const { SchemaFields, revalidate, validation } = useFormTree(handleTree, {
+      const { SchemaFields, revalidate } = useFormTree(handleTree, {
         validator,
+        showErrorsWhen: 'always',
       })
       return (
         <form noValidate onInput={revalidate}>
-          <ValidationProvider {...validation} showErrorsWhen="always">
-            <SchemaFields />
-          </ValidationProvider>
+          <SchemaFields />
         </form>
       )
     }

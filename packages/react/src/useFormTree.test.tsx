@@ -3,14 +3,9 @@ import { render } from 'vitest-browser-react'
 import { z } from 'zod'
 import { zodToTree } from '@formframe/input-zod'
 import { jsonSchemaToTree, type JSONSchema } from '@formframe/input-jsonschema'
-import type { ValidationError } from '@formframe/core'
 import { createAjvValidator } from '@formframe/validation-ajv'
 import { createZodValidator } from '@formframe/validation-zod'
-import {
-  useFormTree,
-  ValidationProvider,
-  type FormTreeValidation,
-} from './index'
+import { useFormTree, type FormStore } from './index'
 
 const schema = z.object({
   name: z.string().min(2).meta({ title: 'Name' }),
@@ -34,29 +29,26 @@ const numberTree = jsonSchemaToTree(numberSchema)
 const numberValidator = createAjvValidator(numberSchema)
 
 describe('useFormTree', () => {
-  it('spreads complete validation state without remounting bound fields', async () => {
+  it('auto-provides validation state without remounting bound fields', async () => {
     const onValid = vi.fn()
     const schemaFieldsIdentities = new Set<unknown>()
 
     function Harness() {
-      const { SchemaFields, submit, validation } = useFormTree(tree, {
+      const { SchemaFields, submit } = useFormTree(tree, {
         validator,
       })
       schemaFieldsIdentities.add(SchemaFields)
 
       return (
         <form noValidate onSubmit={submit(onValid)}>
-          <ValidationProvider {...validation}>
-            <SchemaFields />
-          </ValidationProvider>
-          <output data-testid="error-count">{validation.errors.length}</output>
+          <SchemaFields />
           <button type="submit">Submit</button>
         </form>
       )
     }
 
     const screen = await render(<Harness />)
-    expect(screen.getByTestId('error-count').element().textContent).toBe('0')
+    expect(document.querySelectorAll('.jsf-field-errors').length).toBe(0)
     const submit = screen.getByRole('button', { name: 'Submit' })
     const name = screen.getByRole('textbox', { name: 'Name' })
     const inputBeforeValidation = name.element()
@@ -132,17 +124,15 @@ describe('useFormTree', () => {
       bound.submit((data) => {
         expectTypeOf(data).toEqualTypeOf<{ name: string }>()
       })
-      expectTypeOf(bound.validation).toEqualTypeOf<FormTreeValidation>()
-      expectTypeOf(bound.validation).toEqualTypeOf<{
-        errors: ValidationError[]
-        touched: ReadonlySet<string>
-        submitted: boolean
-      }>()
-      expectTypeOf(bound.errors).toEqualTypeOf<ValidationError[]>()
+      // The hook exposes the framework-neutral store (typed to the output).
+      expectTypeOf(bound.store).toEqualTypeOf<FormStore<{ name: string }>>()
 
       useFormTree(numberTree, { validator: numberValidator }).submit((data) => {
         expectTypeOf(data).toMatchObjectType<{ age: number }>()
       })
+
+      // onValid may return a Promise (isSubmitting spans it, ADR 043).
+      useFormTree(tree, { validator }).submit(async () => {})
 
       useFormTree(tree).submit((data) => {
         expectTypeOf(data).toEqualTypeOf<Record<string, unknown>>()

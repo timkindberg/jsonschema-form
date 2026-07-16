@@ -7,7 +7,8 @@
 import { useMemo, useState } from 'react'
 import {
   useFormTree,
-  ValidationProvider,
+  FormStoreProvider,
+  SchemaFields,
   ValidationSummary,
 } from '@formframe/renderer-react'
 import { createAjvValidator } from '@formframe/validation-ajv'
@@ -44,8 +45,9 @@ const tree = jsonSchemaToTree(schema)
 
 function App() {
   const validator = useMemo(() => createAjvValidator(schema), [])
-  const { SchemaFields, submit, revalidate, validation } = useFormTree(tree, {
+  const { form, submit, revalidate, store } = useFormTree(tree, {
     validator,
+    showErrorsWhen: 'always',
   })
   const [submitted, setSubmitted] = useState<Record<string, unknown> | null>(
     null
@@ -88,18 +90,18 @@ function App() {
         stay quiet until a field blurs); see <code>App_13</code> for that UX.
       </p>
 
-      <form
-        noValidate
-        onSubmit={submit((data) => setSubmitted(data))}
-        onInput={revalidate}
-        onChange={revalidate}
-      >
-        <ValidationProvider {...validation} showErrorsWhen="always">
+      <FormStoreProvider store={store} showErrorsWhen="always">
+        <form
+          noValidate
+          onSubmit={submit((data) => setSubmitted(data))}
+          onInput={revalidate}
+          onChange={revalidate}
+        >
           <ValidationSummary />
-          <SchemaFields />
-        </ValidationProvider>
-        <button type="submit">Submit</button>
-      </form>
+          <SchemaFields form={form} />
+          <button type="submit">Submit</button>
+        </form>
+      </FormStoreProvider>
 
       {submitted && (
         <>

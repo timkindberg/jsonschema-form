@@ -16,7 +16,7 @@ import { createAjvValidator } from '@formframe/validation-ajv'
 import {
   createRenderer,
   defaultAdapter,
-  ValidationProvider,
+  FormStoreProvider,
   fieldControlId,
   fieldErrorId,
   type ReactPartialAdapter,
@@ -253,16 +253,16 @@ function ValidationCountingHarness({
   Counting: ReturnType<typeof createRenderer>
 }) {
   const validator = useMemo(() => createAjvValidator(validationSchema), [])
-  const { form, revalidate, validation } = useFormTree(validationTree, {
-    validator,
-  })
-  // This suite is about error-store fan-out (ADR 023/037), not the touched display
-  // policy (ADR 027) — report immediately so a new error renders on change.
+  const { form, revalidate, store } = useFormTree(validationTree, { validator })
   return (
     <form noValidate onChange={revalidate}>
-      <ValidationProvider {...validation} showErrorsWhen="always">
+      {/* This suite is about error-store fan-out (ADR 023/037), not the touched
+          display policy (ADR 027). The custom `Counting` renderer reads the store
+          through FormStoreProvider, so the policy is set here — report
+          immediately so a new error renders. */}
+      <FormStoreProvider store={store} showErrorsWhen="always">
         <Counting form={form} />
-      </ValidationProvider>
+      </FormStoreProvider>
     </form>
   )
 }
@@ -318,15 +318,14 @@ function TouchedCountingHarness({
   Counting: ReturnType<typeof createRenderer>
 }) {
   const validator = useMemo(() => createAjvValidator(touchedGateSchema), [])
-  const { form, revalidate, handleBlur, validation } = useFormTree(
-    touchedGateTree,
-    { validator }
-  )
+  const { form, revalidate, handleBlur, store } = useFormTree(touchedGateTree, {
+    validator,
+  })
   return (
     <form noValidate onInput={revalidate} onBlur={handleBlur}>
-      <ValidationProvider {...validation} showErrorsWhen="touched">
+      <FormStoreProvider store={store} showErrorsWhen="touched">
         <Counting form={form} />
-      </ValidationProvider>
+      </FormStoreProvider>
     </form>
   )
 }

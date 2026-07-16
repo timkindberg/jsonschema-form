@@ -18,6 +18,8 @@
 export interface TouchedStore {
   /** Whether this field path has been touched. */
   getTouched(path: string): boolean
+  /** The whole touched set — for orchestration that needs to extend it. */
+  snapshotTouched(): ReadonlySet<string>
   /** Whether the form has had a submit attempt (reveals all under 'touched'/'submit'). */
   isSubmitted(): boolean
   /** Subscribe to any change; returns an unsubscribe. */
@@ -37,6 +39,9 @@ export function createTouchedStore(
   return {
     getTouched(path) {
       return touched.has(path)
+    },
+    snapshotTouched() {
+      return touched
     },
     isSubmitted() {
       return submitted

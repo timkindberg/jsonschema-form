@@ -14,7 +14,7 @@ import { jsonSchemaToTree } from '@formframe/input-jsonschema'
 import type { JSONSchema } from '@formframe/input-jsonschema'
 import { createAjvValidator } from '@formframe/validation-ajv'
 import { useFormTree } from './useFormTree'
-import { ValidationProvider, fieldControlId, fieldErrorId } from './renderer'
+import { fieldControlId, fieldErrorId } from './renderer'
 import type { ShowErrorsWhen } from './displayPolicy'
 
 const schema: JSONSchema = {
@@ -31,8 +31,10 @@ const tree = jsonSchemaToTree(schema)
 // (ADR 027 makes that `'touched'`).
 function Harness({ mode }: { mode?: ShowErrorsWhen }) {
   const validator = useMemo(() => createAjvValidator(schema), [])
-  const { SchemaFields, submit, revalidate, handleBlur, validation } =
-    useFormTree(tree, { validator })
+  const { SchemaFields, submit, revalidate, handleBlur } = useFormTree(tree, {
+    validator,
+    showErrorsWhen: mode,
+  })
   return (
     <form
       noValidate
@@ -45,9 +47,7 @@ function Harness({ mode }: { mode?: ShowErrorsWhen }) {
         revalidate(e)
       }}
     >
-      <ValidationProvider {...validation} showErrorsWhen={mode}>
-        <SchemaFields />
-      </ValidationProvider>
+      <SchemaFields />
       <button type="submit">Submit</button>
     </form>
   )

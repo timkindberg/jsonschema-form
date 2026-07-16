@@ -6,11 +6,22 @@
 
 // Source-agnostic React hook
 export { useFormTree } from './useFormTree'
+export type { BoundSchemaFieldsProps, UseFormTreeOptions } from './useFormTree'
+
+// Framework-neutral form store (ADR 042–046) — the state + validation
+// orchestration `useFormTree` binds. Exported for advanced composition and as
+// the seam a non-React binding would drive (kept internal to @formframe/react
+// until a second framework earns extraction — ADR 008).
+export { createFormStore } from './formStore'
 export type {
-  BoundSchemaFieldsProps,
-  FormTreeValidation,
-  UseFormTreeOptions,
-} from './useFormTree'
+  FormStore,
+  CreateFormStoreOptions,
+  AnyValidator,
+  OnValid,
+} from './formStore'
+export type { ErrorStore } from './errorStore'
+export type { TouchedStore } from './touchedStore'
+export type { StatusStore } from './statusStore'
 
 // Continuation renderer (ADR 010/013) — typed, front-end-agnostic (operates on
 // the Core tree). Schema compilation lives in separate input packages.
@@ -26,10 +37,15 @@ export {
   Default,
   Children,
   ValidationProvider,
+  FormStoreProvider,
   useFieldErrors,
   useFieldErrorDisplay,
   useDisplayPolicy,
   useValidationErrors,
+  useIsValidating,
+  useIsSubmitting,
+  useValidationFailure,
+  formatValidationFailure,
   fieldControlId,
   fieldErrorId,
 } from './renderer'
