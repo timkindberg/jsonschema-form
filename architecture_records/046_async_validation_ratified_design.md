@@ -176,3 +176,42 @@ consolidates; ADR 009 (the gate suite this matrix feeds); `jsonschema-form-5ss`
 (v1 DX finish — final surface names, unified `onSubmit` shape); `jsonschema-form-8f6`
 (submit-outcome API-shape and no-error-UI safeguards). Hands a resolved,
 test-mapped design to the Validation implementation track.
+
+---
+
+## Post-implementation review addendum (2026-07-15)
+
+After the feature landed (PR #71), a tri-lens library review (adversarial /
+type-DX / library-author — full record in
+`history/2026-07-15-9jk-async-validation-tribe-review.md`) audited the shipped
+surface. All three verdicts were ship-with-fixes; no design decision above was
+reopened. The fixes applied in response:
+
+- **Single async detector (soundness).** Async branching went through
+  `instanceof Promise` in the sync `fromStandardSchema` but a `.then` duck-type in
+  the store — so a cross-realm/library **thenable** could slip through sync
+  consume and read as a false valid verdict. Both now use one exported
+  `isThenable` in Core (§ Seam, ADR 041/045).
+- **`ValidationResult` is a discriminated union on `valid`** with `data?: never`
+  on the invalid arm; the submit-time `as Output` is documented as an intentional
+  assertion boundary (see ADR 025 addendum, 2026-07-15).
+- **Reference-count floor.** `statusStore` `decValidating`/`decSubmitting` now
+  no-op at zero, so a double-settle bug can't drive a count negative and wedge a
+  pending boolean (§ Pending, ADR 044).
+- **Failure DX + coverage.** Added `formatValidationFailure(unknown): string|null`
+  beside `useValidationFailure`, and a React-level test asserting a rejecting
+  validator surfaces through the hook (the matrix's Failure row previously had
+  only store-level coverage).
+- **Docs truth.** README now leads with the batteries-included bound
+  `SchemaFields`, documents the **superseded-submit-still-fires-`onValid`** hazard
+  (§3 above) with a "disable submit while pending" guard, documents that `onValid`
+  rejections are the consumer's concern (§3), and carries a migration note for the
+  removed `validation` return. Stale JSDoc/comments (`Validator` "async is future",
+  `displayPolicy` referencing the removed `validation`) were corrected.
+
+**Deferred (captured, not blocking):** a per-field double-subscription micro-cost
+in the default field renderer; `FormStoreProvider` erasing the `Output` generic;
+the `Output` default differing between `useFormTree` (`Record<string, unknown>`)
+and `createFormStore` (`unknown`); and an optional future `onSubmitError` /
+`AbortSignal`-on-submit for unmount-during-flight. These are ergonomics/among the
+`5ss` DX-finish and `8f6` submit-outcome threads, not correctness gaps.

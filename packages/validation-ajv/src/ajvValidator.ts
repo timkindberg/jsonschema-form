@@ -71,14 +71,14 @@ export function createAjvValidator<const S extends JSONSchema>(
 
   return (data: unknown) => {
     if (!mutates) {
-      const valid = validate(data) === true
-      const errors = valid ? [] : (validate.errors ?? []).map(toError)
-      return { valid, errors }
+      if (validate(data) === true) return { valid: true, errors: [] }
+      return { valid: false, errors: (validate.errors ?? []).map(toError) }
     }
     const coerced = cloneJsonish(data)
-    const valid = validate(coerced) === true
-    const errors = valid ? [] : (validate.errors ?? []).map(toError)
-    return { valid, errors, data: coerced as InferData<S> }
+    if (validate(coerced) === true) {
+      return { valid: true, errors: [], data: coerced as InferData<S> }
+    }
+    return { valid: false, errors: (validate.errors ?? []).map(toError) }
   }
 }
 

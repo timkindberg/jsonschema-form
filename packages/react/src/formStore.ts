@@ -21,6 +21,7 @@
 // superseded submit still hands validated data to the consumer while the visible
 // errors belong to the newer run.
 
+import { isThenable } from '@formframe/core'
 import type {
   AsyncValidator,
   ValidationResult,
@@ -130,7 +131,7 @@ export function createFormStore<Output = unknown>(
       settleFailure(reason)
       return
     }
-    if (isPromise(outcome)) {
+    if (isThenable<ValidationResult<Output>>(outcome)) {
       outcome.then(settleVerdict, settleFailure)
     } else {
       settleVerdict(outcome)
@@ -173,6 +174,12 @@ export function createFormStore<Output = unknown>(
           if (current) publishVerdict(result)
           // …but onValid is ungated: it fires on THIS run's own verdict (ADR 043).
           if (result.valid) {
+            // Output-assertion boundary (ADR 025, review addendum): a valid
+            // verdict means the validator vouched this snapshot is `Output`. When
+            // it transforms nothing (`data` omitted) the consumer's own snapshot
+            // IS the output, so asserting it to `Output` is sound *by the
+            // validator's contract* — the type system just can't see the runtime
+            // check. A mis-typed `AnyValidator<Output>` is caller error.
             const value = (result.data ?? data) as Output
             let handled: void | Promise<void>
             try {
@@ -183,7 +190,7 @@ export function createFormStore<Output = unknown>(
               endSubmit()
               return
             }
-            if (isPromise(handled)) {
+            if (isThenable(handled)) {
               handled.then(endSubmit, endSubmit)
             } else {
               endSubmit()
@@ -211,8 +218,4 @@ export function createFormStore<Output = unknown>(
       currentValidator = validator
     },
   }
-}
-
-function isPromise<T>(value: T | Promise<T>): value is Promise<T> {
-  return typeof (value as { then?: unknown })?.then === 'function'
 }

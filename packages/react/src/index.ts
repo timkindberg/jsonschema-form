@@ -45,6 +45,7 @@ export {
   useIsValidating,
   useIsSubmitting,
   useValidationFailure,
+  formatValidationFailure,
   fieldControlId,
   fieldErrorId,
 } from './renderer'

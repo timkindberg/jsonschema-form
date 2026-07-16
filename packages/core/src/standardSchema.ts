@@ -17,6 +17,7 @@
 // structurally identical to `@standard-schema/spec` — a value typed as our
 // `StandardSchemaV1` is accepted anywhere the real one is.
 
+import { isThenable } from './validation'
 import type { AsyncValidator, Validator } from './validation'
 
 /** The Standard Schema v1 interface (inlined from standardschema.dev). */
@@ -128,10 +129,13 @@ export function fromStandardSchema<O>(
   const validate = schema['~standard'].validate
   return (data) => {
     const result = validate(data)
-    if (result instanceof Promise) {
+    // Any thenable — not just a real `Promise` — means async; a cross-realm or
+    // library thenable slipping through would otherwise be treated as a success
+    // (missing `issues`) and yield a false valid verdict (review addendum).
+    if (isThenable(result)) {
       throw new TypeError(
         'fromStandardSchema: schema validated asynchronously (returned a Promise); ' +
-          'the Validator seam is synchronous (ADR 019).'
+          'the Validator seam is synchronous (ADR 019). Use fromStandardSchemaAsync.'
       )
     }
     return standardResultToValidation(result)

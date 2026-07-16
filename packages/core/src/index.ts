@@ -99,7 +99,7 @@ export {
 
 // Validation capability slot (ADR 019) — the neutral, side-loaded contract.
 // Adapters (e.g. @formframe/validation-ajv) implement `Validator`.
-export { groupErrorsByPath } from './validation'
+export { groupErrorsByPath, isThenable } from './validation'
 
 // Standard Schema interop (ADR 026) — let the Validator seam emit/consume the
 // cross-library https://standardschema.dev interface (RHF, TanStack Form, Zod…).

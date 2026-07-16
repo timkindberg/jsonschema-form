@@ -35,6 +35,7 @@ import {
   useIsValidating,
   useIsSubmitting,
   useValidationFailure,
+  formatValidationFailure,
 } from '@formframe/renderer-react'
 
 // Simulated remote uniqueness check. Structure (zodToTree) is compiled from the
@@ -104,9 +105,10 @@ function Pending() {
 
 /** The run-failure banner (validator threw/rejected), separate from field errors. */
 function FailureBanner() {
-  const failure = useValidationFailure()
-  if (!failure) return null
-  const message = failure instanceof Error ? failure.message : String(failure)
+  // `formatValidationFailure` turns the raw `unknown` reason into a string (or
+  // null) — no per-app `instanceof Error` dance.
+  const message = formatValidationFailure(useValidationFailure())
+  if (!message) return null
   return (
     <p role="alert" style={{ color: 'crimson' }}>
       ⚠ Couldn&apos;t validate: {message} — please retry.

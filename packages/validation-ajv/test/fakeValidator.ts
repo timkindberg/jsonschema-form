@@ -21,7 +21,8 @@ export function createFakeValidator(schema: unknown): Validator {
   return (data: unknown) => {
     const errors: ValidationError[] = []
     check(root, data, '', errors)
-    return { valid: errors.length === 0, errors }
+    if (errors.length === 0) return { valid: true, errors: [] }
+    return { valid: false, errors }
   }
 }
 

@@ -190,6 +190,34 @@ in scope; this makes "validators don't mutate" impossible to regress silently.
 
 ---
 
+## Addendum (2026-07-15): discriminated `ValidationResult` and the output-assertion boundary
+
+A tri-lens library review of the async-validation PR (#71,
+`history/2026-07-15-9jk-async-validation-tribe-review.md`) flagged that
+`ValidationResult` was a single interface with a bare `valid: boolean`, and that
+the React store's submit path asserts the validated value to the caller's
+`Output` type via `(result.data ?? data) as Output`. Two decisions resolve it:
+
+1. **`ValidationResult<T>` is now a discriminated union on `valid`** —
+   `{ valid: true; errors; data?: T } | { valid: false; errors; data?: never }`.
+   `data` stays **optional on success** (this ADR's contract is unchanged: a
+   validator that transforms nothing omits it and callers fall back to the input),
+   but an *invalid* result can no longer carry `data` — a consumer can never read
+   "transformed data" off a failed verdict. Producers that built `valid` as a
+   computed boolean (AJV, the fake contract validator) now branch on the verdict.
+
+2. **The `as Output` cast is retained as a documented assertion boundary, not
+   removed.** Requiring `data` on success would have forced every adapter to
+   always return a fresh value — reversing this ADR's "omit `data`, fall back to
+   input, and never alias the input" invariants (AJV's no-clone hot path echoes
+   the input, which by this ADR must *not* be aliased as `data`). So the cast is
+   left in one commented site: a valid verdict means the validator **vouched**
+   the snapshot is `Output`; when it transforms nothing, the consumer's own
+   snapshot *is* the output. The assertion is sound *by the validator's
+   contract* — the type system simply can't observe the runtime check. A
+   mis-typed `AnyValidator<Output>` is caller error, the same as any cast at a
+   validated boundary.
+
 **Relates to:** ADR 019 (the contract this evolves), ADR 020 (the shared contract
 suite that gates the two new invariants), ADR 008 (the second implementation —
 Zod — already exhibits the target behaviour, so the seam is earned, not

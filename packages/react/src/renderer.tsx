@@ -389,6 +389,18 @@ export function useValidationFailure(): unknown {
   )
 }
 
+/**
+ * Format a {@link useValidationFailure} reason into a display string, or `null`
+ * when there is no failure. The failure surface is deliberately `unknown` (a
+ * validator can throw/reject anything); this saves every consumer re-writing the
+ * same `instanceof Error` dance — an `Error` → its `message`, anything else →
+ * `String(reason)`.
+ */
+export function formatValidationFailure(failure: unknown): string | null {
+  if (failure == null) return null
+  return failure instanceof Error ? failure.message : String(failure)
+}
+
 const alwaysShow = () => true
 
 /**

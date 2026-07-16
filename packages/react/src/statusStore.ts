@@ -67,6 +67,10 @@ export function createStatusStore(): StatusStore {
       if (validating === 1) notify()
     },
     decValidating() {
+      // Floor at zero: a double-settle bug must not drive the count negative
+      // (which would keep `isValidating()` stuck false while work is in flight).
+      // Guarding here means every dec below zero is a no-op, not a silent under-run.
+      if (validating === 0) return
       validating--
       if (validating === 0) notify()
     },
@@ -75,6 +79,7 @@ export function createStatusStore(): StatusStore {
       if (submitting === 1) notify()
     },
     decSubmitting() {
+      if (submitting === 0) return
       submitting--
       if (submitting === 0) notify()
     },

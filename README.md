@@ -64,14 +64,42 @@ Adapt any synchronous Standard Schema implementation with
 
 ```tsx
 import { fromStandardSchema } from '@formframe/core'
+import { useFormTree } from '@formframe/renderer-react'
+
+const validator = fromStandardSchema(profileSchema)
+
+export function ProfileForm() {
+  const { SchemaFields, submit } = useFormTree(profileTree, { validator })
+
+  return (
+    <form noValidate onSubmit={submit((data) => console.log(data))}>
+      <SchemaFields />
+      <button type="submit">Save profile</button>
+    </form>
+  )
+}
+```
+
+The `SchemaFields` returned from the hook is the batteries-included path: it
+provides the form store to its own subtree, so each field shows its errors inline
+(touched-gated by default, ADR 027) with no provider to wire. Validation runs on
+submit; successful (optionally transformed) output is passed to your callback.
+Wire the returned `revalidate` to `onInput`/`onChange`/`onBlur` for live
+validation.
+
+### Reading form state alongside the fields
+
+For a shared error summary, a submit spinner, or anything that reads form state
+as a _sibling_ of the fields, wrap that region in `FormStoreProvider` and render
+the raw `SchemaFields` with the hook's `store`:
+
+```tsx
 import {
   useFormTree,
   FormStoreProvider,
   SchemaFields,
   ValidationSummary,
 } from '@formframe/renderer-react'
-
-const validator = fromStandardSchema(profileSchema)
 
 export function ProfileForm() {
   const { form, submit, revalidate, handleBlur, store } = useFormTree(
@@ -98,12 +126,15 @@ export function ProfileForm() {
 }
 ```
 
-Validation runs on submit here. Wire the returned `revalidate` handler to
-`onInput`, `onChange`, or `onBlur` when the product calls for live validation.
-Successful transformed output is passed to the submit callback. Errors, touched,
-submitted, and pending state all live in the hook's `store`; `FormStoreProvider`
-lets the summary and field errors read it without prop-drilling, and only the
-components whose data changed re-render.
+Errors, touched, submitted, and pending state all live in the hook's `store`;
+`FormStoreProvider` lets the summary and field errors read it without
+prop-drilling, and only the components whose data changed re-render.
+
+> **Migrating from the old `validation` return.** Earlier versions returned a
+> `validation` object you spread into `ValidationProvider`. That's replaced by
+> the `store` + `FormStoreProvider` above and the selector hooks
+> (`useValidationErrors`, `useIsValidating`, …): swap
+> `<ValidationProvider {...validation}>` for `<FormStoreProvider store={store}>`.
 
 ### Async validation
 
@@ -136,6 +167,19 @@ const validator = createZodAsyncValidator(schemaWithAsyncRule)
 `submit`'s success handler may also be `async` (e.g. an awaited save);
 `useIsSubmitting()` spans it. See `examples/basic-react` example 16 for a
 runnable walkthrough.
+
+**Submit vs. live can disagree — guard your submit.** A submit's `onValid` fires
+on that submit's _own_ click-time verdict, even if a newer live revalidation has
+since superseded the visible errors (ADR 043 — errors are authority-gated,
+`onValid` is not). So a submit started before a slow async check finishes can
+still hand you click-time data while the form shows a newer verdict. Disable the
+submit while a verdict is pending to avoid persisting stale data:
+`disabled={useIsSubmitting() || useIsValidating()}` (example 16 does this).
+
+**`onValid` errors are yours.** A throw or rejected promise from your submit
+handler clears `isSubmitting` but is **not** routed to `useValidationFailure()`
+(that surface is for validator-run failures, not your save). Handle save errors
+inside `onValid` (try/catch or `.catch`) — the library won't surface them.
 
 **Costs and caveats.** `revalidate` runs the _whole_ validator each time (no
 dirty-diffing), and any async rule makes the whole schema async, so every pass

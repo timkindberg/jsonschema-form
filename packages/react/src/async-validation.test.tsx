@@ -14,6 +14,8 @@ import {
   SchemaFields,
   useIsValidating,
   useIsSubmitting,
+  useValidationFailure,
+  formatValidationFailure,
 } from './renderer'
 
 const schema = {
@@ -122,5 +124,42 @@ describe('async validation through useFormTree (ADR 041–046)', () => {
     await expect.poll(() => errorEls().length).toBe(1)
     await name.fill('ab') // valid — a newer pass supersedes
     await expect.poll(() => errorEls().length).toBe(0)
+  })
+
+  it('surfaces a validator run failure via useValidationFailure', async () => {
+    // A rejecting validator is a run *failure* (ADR 042), not an invalid verdict:
+    // `useValidationFailure` carries the raw reason and `formatValidationFailure`
+    // renders it. onValid must not fire.
+    const onValid = vi.fn()
+    function FailureView() {
+      const message = formatValidationFailure(useValidationFailure())
+      return <output data-testid="failure">{message ?? ''}</output>
+    }
+    function FailureHarness() {
+      const validator = useMemo<AsyncValidator>(
+        () => async () => {
+          throw new Error('service down')
+        },
+        []
+      )
+      const { form, submit, store } = useFormTree(tree, { validator })
+      return (
+        <FormStoreProvider store={store} showErrorsWhen="always">
+          <form noValidate onSubmit={submit(onValid)}>
+            <SchemaFields form={form} />
+            <FailureView />
+            <button type="submit">Submit</button>
+          </form>
+        </FormStoreProvider>
+      )
+    }
+    const screen = await render(<FailureHarness />)
+    await screen.getByRole('textbox', { name: 'Name' }).fill('Ada')
+    await screen.getByRole('button', { name: /submit/i }).click()
+
+    const failureText = () =>
+      document.querySelector('[data-testid="failure"]')?.textContent ?? ''
+    await expect.poll(() => failureText()).toBe('service down')
+    expect(onValid).not.toHaveBeenCalled()
   })
 })
