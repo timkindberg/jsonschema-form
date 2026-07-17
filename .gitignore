@@ -46,3 +46,6 @@ temp/
 .DS_Store
 Thumbs.db
 
+# Deprecated local issue tracker (migrated to GitHub Issues)
+.beads/
+

@@ -58,5 +58,5 @@
     "jsonschema-form-q8v": 114,
     "jsonschema-form-s37": 115
   },
-  "notes": "Primary triage migrated 36 allowlisted beads to #72\u2013#107. Extras #108\u2013#115 were created from leftover open beads that may still be owned by parallel agents \u2014 those bd issues were intentionally left open. .beads/ was NOT deleted while parallel agents still have open work."
+  "notes": "Migrated from bd (beads) to GitHub Issues. Triage allowlist → #72–#107; parallel-agent leftovers → #108–#115 (bd issues closed afterward). .beads/ removed; this map is the durable bd-id → GH-number lookup for ADR/code citations."
 }
