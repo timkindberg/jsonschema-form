@@ -208,15 +208,16 @@ export type TypedRuleRegistrar<TS extends FormShape> = Omit<
  * in dev). Reactive behavior belongs INSIDE a handler (it is a real component that
  * may call hooks), not in rebuilding the rule set.
  *
- * CAVEAT — the narrowed types reflect the DEFAULT presentation (bd bh7.8): the
- * `FormShape` a front-end brands on is resolved with `NoOverrides`. If you re-present
- * with `overrideWidgets`, the typed `Control` can desync from what actually renders
- * (type says `choicegroup`, DOM is a `<select>`). Path/value/description narrowing is
- * unaffected; don't trust the narrowed control type for overridden paths yet.
+ * OVERRIDES (bd bh7.8, resolved): if you re-present with `overrideWidgets(map)` via
+ * `useFormTree`, type this hook off the returned `form` (which carries the override
+ * re-narrowing) rather than the pre-override input tree — then the typed `Control`
+ * is provably what renders. Typing off the pre-override tree still reflects the
+ * DEFAULT presentation (correct for that tree, but not for an overridden `form`).
  *
  * ```ts
- * const tree = useMemo(() => jsonSchemaToTree(schema), [])   // brands with FormShapeOf<S>
- * const renderNode = useRenderNodeRules(tree, rules)         // rules: (r: TypedRuleRegistrar<Shape>) => void
+ * const tree = useMemo(() => jsonSchemaToTree(schema), [])
+ * const { form } = useFormTree(tree, { resolvePresentation: overrideWidgets(MAP) })
+ * const renderNode = useRenderNodeRules(form, rules)  // types track the overrides
  * return <Fields renderNode={renderNode} />
  * ```
  */

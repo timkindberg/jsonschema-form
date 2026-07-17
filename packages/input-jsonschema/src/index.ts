@@ -8,7 +8,7 @@
 
 export const VERSION = '0.0.0'
 
-export { jsonSchemaToTree } from './jsonSchemaToTree'
+export { jsonSchemaToTree, jsonSchemaToRuntimeTree } from './jsonSchemaToTree'
 export type { JSONSchema, JSONSchemaObject } from './types'
 export type { InferData, FieldPath } from './infer'
 // Path-narrowed presentation types (ADR 047 §4) — the schema-owning half of the

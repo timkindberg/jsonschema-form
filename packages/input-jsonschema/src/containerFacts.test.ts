@@ -17,7 +17,7 @@ import {
   layered,
   type PresentationResolver,
 } from '@formframe/core'
-import { jsonSchemaToTree } from './jsonSchemaToTree'
+import { jsonSchemaToTree, jsonSchemaToRuntimeTree } from './jsonSchemaToTree'
 import { compileRoot } from './compile'
 import { assertArrayNode, assertField, assertGroupNode } from './nodeTestUtils'
 import type { JSONSchema } from './types'
@@ -107,7 +107,7 @@ function submitPresented(
   resolve: PresentationResolver,
   pairs: Array<[string, string]>
 ): Record<string, unknown> {
-  const form = present(jsonSchemaToTree(schema), resolve)
+  const form = present(jsonSchemaToRuntimeTree(schema), resolve)
   let submitted: Record<string, unknown> = {}
   const handleSubmit = form.submit((data) => {
     submitted = data

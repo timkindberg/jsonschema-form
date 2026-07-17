@@ -5,7 +5,7 @@ import {
   defaultPresentation,
   type AnyNode,
 } from '@formframe/core'
-import { jsonSchemaToTree } from './jsonSchemaToTree'
+import { jsonSchemaToRuntimeTree } from './jsonSchemaToTree'
 import type { JSONSchema } from './types'
 import { choicegroupCtl } from './controlTestUtils'
 import { assertArrayNode, assertField } from './nodeTestUtils'
@@ -45,7 +45,7 @@ describe('array robustness', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const rowsNode = form.children.find((c) => c.path === 'rows')
       assertArrayNode(rowsNode)
 
@@ -74,7 +74,7 @@ describe('array robustness', () => {
       },
     }
 
-    const tree = present(jsonSchemaToTree(schema), defaultPresentation)
+    const tree = present(jsonSchemaToRuntimeTree(schema), defaultPresentation)
     const rowsNode = tree.children.find((c) => c.path === 'rows')
     assertArrayNode(rowsNode)
 
@@ -100,7 +100,7 @@ describe('array robustness', () => {
       },
     }
 
-    const form = jsonSchemaToTree(schema)
+    const form = jsonSchemaToRuntimeTree(schema)
     const rowsNode = form.children.find((c) => c.path === 'rows')
     assertArrayNode(rowsNode)
 
@@ -143,7 +143,7 @@ describe('array robustness', () => {
       },
     }
 
-    const form = jsonSchemaToTree(schema)
+    const form = jsonSchemaToRuntimeTree(schema)
     const tags = form.getField('tags')
     assertField(tags)
 

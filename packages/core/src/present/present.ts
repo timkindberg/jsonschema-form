@@ -30,6 +30,7 @@ import type {
   WidgetName,
 } from '../parser/nodeTypes'
 import { serializeNode } from '../parser/utils'
+import type { WidgetOverrideMap, WidgetOverrideResolver } from './formShape'
 
 // --- Stage B: the shared widget→control-kind table (ADR 047 §4) -----------------
 //
@@ -165,13 +166,18 @@ export function layered<S = unknown>(
  * typed and stay runtime-guarded (`where(facts => …)` degrades to a union); this
  * exact-path form is the one that carries a static type.
  */
-export function overrideWidgets<S = unknown>(
-  map: Readonly<Record<string, WidgetName>>
-): PresentationResolver<S> {
-  return (facts) => {
+export function overrideWidgets<const O extends WidgetOverrideMap, S = unknown>(
+  map: O
+): WidgetOverrideResolver<S, O> {
+  // The phantom `[WIDGET_OVERRIDES]` brand is compile-time only (never assigned);
+  // the runtime value is the same plain resolver as before. `const O` pins the
+  // exact map so `useFormTree` can thread it into the presented `form`'s brand and
+  // re-narrow the typed control to match what this resolver renders (bd bh7.8).
+  const resolve: PresentationResolver<S> = (facts) => {
     const widget = map[facts.path]
     return widget ? { widget } : undefined
   }
+  return resolve as WidgetOverrideResolver<S, O>
 }
 
 // --- Core widget catalog: neutral part derivers (ADR 029 §4) --------------------

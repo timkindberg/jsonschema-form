@@ -1,10 +1,10 @@
 // Local $ref / $defs resolution in the Core JSON Schema front-end.
 //
 // The address shape lives once under $defs; shipping and billing both reuse it
-// via $ref before jsonSchemaToTree compiles the form tree.
+// via $ref before jsonSchemaToRuntimeTree compiles the form tree.
 import { useState } from 'react'
 import { useFormTree } from '@formframe/renderer-react'
-import { jsonSchemaToTree } from '@formframe/input-jsonschema'
+import { jsonSchemaToRuntimeTree } from '@formframe/input-jsonschema'
 import type { JSONSchema } from '@formframe/input-jsonschema'
 
 const addressDef = {
@@ -38,7 +38,7 @@ const schema = {
     Address: addressDef,
   },
 } as JSONSchema
-const tree = jsonSchemaToTree(schema)
+const tree = jsonSchemaToRuntimeTree(schema)
 
 function App() {
   const { SchemaFields, submit } = useFormTree(tree)
@@ -53,8 +53,8 @@ function App() {
         The shared <code>Address</code> object is declared once under{' '}
         <code>$defs</code> and referenced twice with <code>$ref</code>. Core
         resolves those local JSON Pointer refs before{' '}
-        <code>jsonSchemaToTree</code> runs, so the rendered form matches an
-        equivalent inlined schema.
+        <code>jsonSchemaToRuntimeTree</code> runs, so the rendered form matches
+        an equivalent inlined schema.
       </p>
 
       <form onSubmit={submit(setSubmitted)}>

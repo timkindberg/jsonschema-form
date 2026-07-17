@@ -1,4 +1,4 @@
-import { jsonSchemaToTree } from '@formframe/input-jsonschema'
+import { jsonSchemaToRuntimeTree } from '@formframe/input-jsonschema'
 import type { JSONSchema } from '@formframe/input-jsonschema'
 import { createRenderer, defaultAdapter } from '@formframe/renderer-react'
 
@@ -26,7 +26,7 @@ const schema: JSONSchema = {
   required: ['name'],
 }
 
-const form = jsonSchemaToTree(schema)
+const form = jsonSchemaToRuntimeTree(schema)
 
 // 1. Nothing supplied — the whole tree renders diagnostic markers.
 const FieldsEmpty = createRenderer({})

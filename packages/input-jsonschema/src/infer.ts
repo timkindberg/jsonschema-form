@@ -100,7 +100,9 @@ type FieldPathFromSchema<
       : S extends { readonly type: 'array'; readonly items: infer I }
         ? Prefix extends ''
           ? never
-          : FieldPathFromArrayItems<I, Prefix, Depth>
+          : IsScalarChoiceArray<S> extends true
+            ? never
+            : FieldPathFromArrayItems<I, Prefix, Depth>
         : never
 
 /**
@@ -163,23 +165,53 @@ export type SchemaAt<
         : unknown
       : unknown
 
-/** Classify a sub-schema's node kind (object/array/leaf) — the runtime `nodeType`
- * for the common cases. (Scalar-choice arrays that Core collapses to one leaf are
- * an edge the default rule handles at runtime; this mirrors the structural kind.)
- *
- * KNOWN EDGE (bd bh7.9): this reads the STRUCTURE (`type: 'array'` → `'array'`),
- * but Core collapses an array of a fixed choice set (e.g. `array` of `enum` → a
- * single multi-select) into ONE leaf field at runtime. So for that specific shape
- * the type says "array path" while the runtime produces a field — the two
- * disagree. Common shapes (objects, arrays of objects, scalar fields) are exact;
- * this is a corner left as a P2 accuracy gap, not a correctness bug (the default
- * rule still renders it). */
+/** The `items` sub-schema of a single-schema array (tuple `items` → never; those
+ * degrade to `unknown` throughout, per {@link InferData}). */
+type ArrayItemsOf<S> = S extends {
+  readonly type: 'array'
+  readonly items: infer I
+}
+  ? I extends readonly unknown[]
+    ? never
+    : I
+  : never
+
+/** The finite choice tuple of a scalar-choice array's items (`enum`, or `oneOf`),
+ * else `never`. Mirrors `buildArrayChoices` in compile.ts: an array whose items
+ * carry `enum`/`oneOf` self-identifies as `choices`, and Core's
+ * `defaultPresentation` collapses that container into ONE checkboxes(≤5) /
+ * multiselect(>5) leaf at runtime. So structurally it renders as a FIELD, not an
+ * array — the two kinds are kept in lockstep here and in {@link DefaultWidgetAt}. */
+type ArrayChoiceTuple<S> = [ArrayItemsOf<S>] extends [never]
+  ? never // guard: `never extends {...}` is vacuously true and would infer a tuple
+  : ArrayItemsOf<S> extends {
+        readonly enum: infer E extends readonly unknown[]
+      }
+    ? E
+    : ArrayItemsOf<S> extends {
+          readonly oneOf: infer O extends readonly unknown[]
+        }
+      ? O
+      : never
+
+/** Whether `S` is a scalar-choice array (Core collapses it to one leaf → a field). */
+type IsScalarChoiceArray<S> = [ArrayChoiceTuple<S>] extends [never]
+  ? false
+  : true
+
+/** Classify a sub-schema's node kind (object/array/leaf) — the runtime `nodeType`.
+ * A scalar-choice array (array of `enum`/`oneOf`) is classified `'field'` because
+ * Core collapses it to a single checkboxes/multiselect leaf at runtime (bd bh7.9,
+ * resolved); every other array stays `'array'`. Objects, arrays of objects, and
+ * scalar fields are exact. */
 export type KindOf<S> = S extends { readonly type: 'object' }
   ? 'group'
   : S extends { readonly properties: unknown }
     ? 'group'
     : S extends { readonly type: 'array' }
-      ? 'array'
+      ? IsScalarChoiceArray<S> extends true
+        ? 'field'
+        : 'array'
       : 'field'
 
 type AllPaths<S> = FieldPath<S> & string
@@ -242,16 +274,23 @@ type EnumOf<S> = S extends { readonly enum: infer E extends readonly unknown[] }
   : never
 
 /** The DEFAULT widget a path resolves to (Stage A) — mirrors `defaultPresentation`
- * for the scalar cases the const schema can express (enum → radio/select by count;
- * otherwise a plain input). Kept honest by gate conformance (ADR 047 §4). */
+ * for the scalar cases the const schema can express: a scalar-choice ARRAY
+ * collapses to checkboxes(≤5)/multiselect(>5); a scalar `enum` → radio(≤5)/
+ * select(>5); otherwise a plain input. The array branch is kept in lockstep with
+ * {@link KindOf} (both keyed on {@link IsScalarChoiceArray}) so the widget and the
+ * node kind never disagree (bd bh7.9). Kept honest by gate conformance (ADR 047 §4). */
 export type DefaultWidgetAt<S, P extends string> =
-  SchemaAt<S, P> extends {
-    readonly enum: readonly unknown[]
-  }
-    ? AtMost5<EnumOf<SchemaAt<S, P>>> extends true
-      ? 'radio'
-      : 'select'
-    : 'input'
+  IsScalarChoiceArray<SchemaAt<S, P>> extends true
+    ? AtMost5<ArrayChoiceTuple<SchemaAt<S, P>>> extends true
+      ? 'checkboxes'
+      : 'multiselect'
+    : SchemaAt<S, P> extends {
+          readonly enum: readonly unknown[]
+        }
+      ? AtMost5<EnumOf<SchemaAt<S, P>>> extends true
+        ? 'radio'
+        : 'select'
+      : 'input'
 
 /** No-overrides marker: `Record<never, WidgetName>` = an empty override map, so
  * `WidgetAt` is pure default rule today (ADR 047 §4, `Overrides = {}`). */
@@ -285,19 +324,24 @@ export type ControlAt<
   Overrides extends Record<string, WidgetName> = NoOverrides,
 > = Extract<FieldControl, { kind: ControlKindAt<S, P, Overrides> }>
 
-/** Whether the sub-schema at `P` declares a description (part presence).
+/** Whether the sub-schema at `P` declares a NON-EMPTY description (part presence).
  *
- * KNOWN EDGE (bd bh7.9): this is a STRUCTURAL proxy — "does the schema literal have
- * a `description` property assignable to `string`?" — not a re-run of the runtime's
- * presence logic. It nails the common `description: 'help text'` case, but can
- * disagree at the margins (a description sourced elsewhere, an empty string, a
- * combinator branch). Present/absent is therefore a good-enough compile-time guess,
- * kept honest for the ordinary cases by the conformance tests; a P2 accuracy edge. */
+ * Mirrors the runtime `commonParts` guard (`f.description ? …` in present.ts): a
+ * missing key OR an empty-string `''` yields NO description part. Robust to a
+ * description typed as a widened/branded/union string (`string`, `string |
+ * undefined`) — the key need only carry SOME `string` member that isn't exactly
+ * `''` (bd bh7.9, resolved). A description sourced entirely outside the literal
+ * still can't be seen at compile time; that residual edge is the intrinsic limit
+ * of reading structure, kept honest for the ordinary cases by the conformance tests. */
 export type HasDescription<S, P extends string> =
   SchemaAt<S, P> extends {
-    readonly description: string
+    readonly description: infer D
   }
-    ? true
+    ? [Extract<D, string>] extends [never]
+      ? false
+      : [Extract<D, string>] extends ['']
+        ? false
+        : true
     : false
 
 /** JSON Schema proves description presence from the literal, so the neutral
@@ -322,12 +366,13 @@ export type DescriptionStateOf<S, P extends string> =
  * expensive `FieldControl` extraction + parts assembly (Core) stays lazy, so real
  * cost tracks the handful of paths you customize, not the whole schema.
  *
- * LIMITATION — types reflect the DEFAULT presentation (bd bh7.8): `widget` is
- * resolved with `NoOverrides`. If you re-present the tree with `overrideWidgets`
- * (via `useFormTree`/`present`), the typed control can DESYNC from what renders —
- * the type may say `choicegroup` while the DOM is a `<select>`. Until an `Overrides`
- * map is threaded through the brand, treat this surface as "default presentation
- * only"; don't rely on the narrowed `Control` type for overridden paths.
+ * OVERRIDES (bd bh7.8, resolved): `FormShapeOf<S>` itself resolves `widget` with
+ * `NoOverrides` — the DEFAULT presentation. That is correct for the tree
+ * `jsonSchemaToTree` returns. When you re-present with `overrideWidgets(map)` via
+ * `useFormTree`, the hook threads that `const` map into the returned `form`'s brand
+ * (`ApplyWidgetOverrides`), so typing your customize binding off `form` (not the
+ * pre-override input tree) re-narrows the control to the OVERRIDDEN widget — no
+ * desync. Type off `form`, and the `Control` type is provably what renders.
  */
 export type FormShapeOf<S> = {
   fields: {

@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 
 import { describe, it, expect } from 'vitest'
-import { jsonSchemaToTree } from '@formframe/input-jsonschema'
+import { jsonSchemaToRuntimeTree } from '@formframe/input-jsonschema'
 import type { JSONSchema } from '@formframe/input-jsonschema'
 import { renderToString } from './renderToString'
 import {
@@ -103,7 +103,7 @@ const schema: JSONSchema = {
 describe('renderToDom — DOM ≡ string oracle parity', () => {
   for (const [name, schema] of Object.entries(defaultSchemas)) {
     it(`matches renderToString for "${name}"`, () => {
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const expected = renderToString(form)
       const actual = serializeDomToOracleHtml(renderToDom(form))
       expect(actual).toBe(expected)
@@ -111,7 +111,7 @@ describe('renderToDom — DOM ≡ string oracle parity', () => {
   }
 
   it('matches renderToString for a nameless nested group', () => {
-    const nameless = jsonSchemaToTree({
+    const nameless = jsonSchemaToRuntimeTree({
       type: 'object',
       properties: {
         meta: {
@@ -127,7 +127,7 @@ describe('renderToDom — DOM ≡ string oracle parity', () => {
 })
 
 describe('createDomRenderer — the floor (ADR 013)', () => {
-  const form = jsonSchemaToTree(schema)
+  const form = jsonSchemaToRuntimeTree(schema)
 
   it('returns a DocumentFragment of field elements', () => {
     const root = renderToDom(form)

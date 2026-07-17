@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useFormTree } from '@formframe/renderer-react'
-import { jsonSchemaToTree } from '@formframe/input-jsonschema'
+import { jsonSchemaToRuntimeTree } from '@formframe/input-jsonschema'
 import type { JSONSchema } from '@formframe/input-jsonschema'
 
 // Dynamic arrays on the continuation engine (ADR 015 + 018). Two array shapes:
@@ -66,7 +66,7 @@ const schema: JSONSchema = {
   },
   required: ['name', 'skills', 'addresses'],
 }
-const tree = jsonSchemaToTree(schema)
+const tree = jsonSchemaToRuntimeTree(schema)
 
 function App() {
   const { form, SchemaFields } = useFormTree(tree)

@@ -106,6 +106,13 @@ const jsonSchema = {
       required: ['street'],
     },
     tags: { type: 'array', title: 'Tags', items: { type: 'string' } },
+    // scalar-choice array → collapses to ONE checkboxes leaf → a FIELD, not an
+    // array path (bd bh7.9). `tags` (open-ended) stays a genuine array path.
+    roles: {
+      type: 'array',
+      title: 'Roles',
+      items: { enum: ['admin', 'editor', 'viewer'] },
+    },
   },
   required: ['name'],
 } as const
@@ -133,7 +140,7 @@ describe('FormShape oracle: jsonSchemaToTree brand ↔ FieldProps (bd bh7.4)', (
   // the one the runtime present() pipeline actually produces. Same `kind` literal
   // drives both the runtime loop and the type assertions (root-of-trust closure).
   const controlCases: {
-    path: 'name' | 'age' | 'plan' | 'color' | 'address.street'
+    path: 'name' | 'age' | 'plan' | 'color' | 'address.street' | 'roles'
     kind: FieldControl['kind']
   }[] = [
     { path: 'name', kind: 'input' },
@@ -141,6 +148,8 @@ describe('FormShape oracle: jsonSchemaToTree brand ↔ FieldProps (bd bh7.4)', (
     { path: 'plan', kind: 'choicegroup' },
     { path: 'color', kind: 'select' },
     { path: 'address.street', kind: 'input' },
+    // scalar-choice array collapses to a leaf control at runtime (bd bh7.9).
+    { path: 'roles', kind: 'choicegroup' },
   ]
 
   it('runtime control kinds match the branded widget→control narrowing', () => {
@@ -155,6 +164,8 @@ describe('FormShape oracle: jsonSchemaToTree brand ↔ FieldProps (bd bh7.4)', (
     expectTypeOf<ControlArg<JShape, 'plan'>>().toEqualTypeOf<Choicegroup>()
     expectTypeOf<ControlArg<JShape, 'color'>>().toEqualTypeOf<Select>()
     expectTypeOf<ControlArg<JShape, 'address.street'>>().toEqualTypeOf<Input>()
+    // A scalar-choice array binds off the branded shape as a field Control.
+    expectTypeOf<ControlArg<JShape, 'roles'>>().toEqualTypeOf<Choicegroup>()
   })
 
   it('Description presence tracks the schema literal (present iff declared)', () => {
@@ -192,6 +203,11 @@ describe('FormShape oracle: jsonSchemaToTree brand ↔ FieldProps (bd bh7.4)', (
     expectTypeOf<'tags'>().not.toExtend<
       Parameters<TypedRuleRegistrar<JShape>['field']>[0]
     >()
+    // A scalar-choice array ('roles') is a FIELD path, not an array path (bd bh7.9).
+    expectTypeOf<'roles'>().toExtend<
+      Parameters<TypedRuleRegistrar<JShape>['field']>[0]
+    >()
+    expectTypeOf<'roles'>().not.toExtend<keyof JShape['arrays'] & string>()
   })
 
   it('group props expose caption parts; a plain group omits Description', () => {
@@ -213,6 +229,8 @@ const zodSchema = z.object({
   color: z.enum(['red', 'green', 'blue', 'cyan', 'magenta', 'yellow']),
   address: z.object({ street: z.string() }),
   tags: z.array(z.string()),
+  // scalar-choice array → collapses to ONE checkboxes leaf → a FIELD path (bd bh7.9).
+  roles: z.array(z.enum(['admin', 'editor', 'viewer'])),
 })
 
 const zodTree = zodToTree(zodSchema)
@@ -235,7 +253,7 @@ describe('FormShape oracle: zodToTree brand ↔ FieldProps (bd bh7.4)', () => {
   })
 
   const controlCases: {
-    path: 'name' | 'age' | 'plan' | 'color' | 'address.street'
+    path: 'name' | 'age' | 'plan' | 'color' | 'address.street' | 'roles'
     kind: FieldControl['kind']
   }[] = [
     { path: 'name', kind: 'input' },
@@ -243,6 +261,8 @@ describe('FormShape oracle: zodToTree brand ↔ FieldProps (bd bh7.4)', () => {
     { path: 'plan', kind: 'choicegroup' },
     { path: 'color', kind: 'select' },
     { path: 'address.street', kind: 'input' },
+    // scalar-choice array collapses to a leaf control at runtime (bd bh7.9).
+    { path: 'roles', kind: 'choicegroup' },
   ]
 
   it('runtime control kinds match the branded widget→control narrowing', () => {
@@ -257,6 +277,7 @@ describe('FormShape oracle: zodToTree brand ↔ FieldProps (bd bh7.4)', () => {
     expectTypeOf<ControlArg<ZShape, 'plan'>>().toEqualTypeOf<Choicegroup>()
     expectTypeOf<ControlArg<ZShape, 'color'>>().toEqualTypeOf<Select>()
     expectTypeOf<ControlArg<ZShape, 'address.street'>>().toEqualTypeOf<Input>()
+    expectTypeOf<ControlArg<ZShape, 'roles'>>().toEqualTypeOf<Choicegroup>()
   })
 
   it('Description is an always-present OPTIONAL slot (runtime-registry only)', () => {
@@ -291,6 +312,11 @@ describe('FormShape oracle: zodToTree brand ↔ FieldProps (bd bh7.4)', () => {
     expectTypeOf<'tags'>().not.toExtend<
       Parameters<TypedRuleRegistrar<ZShape>['field']>[0]
     >()
+    // A scalar-choice array ('roles') is a FIELD path, not an array path (bd bh7.9).
+    expectTypeOf<'roles'>().toExtend<
+      Parameters<TypedRuleRegistrar<ZShape>['field']>[0]
+    >()
+    expectTypeOf<'roles'>().not.toExtend<keyof ZShape['arrays'] & string>()
   })
 
   it('group props expose caption parts; the group Description is optional', () => {

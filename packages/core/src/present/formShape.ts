@@ -19,7 +19,7 @@ import type {
   WidgetName,
 } from '../parser/nodeTypes'
 import type { ValidationError } from '../validation'
-import type { WidgetToControlKind } from './present'
+import type { PresentationResolver, WidgetToControlKind } from './present'
 
 /**
  * Whether a path's description part is statically **present**, statically
@@ -126,3 +126,83 @@ export interface TypedTree<TS extends FormShape = FormShape, Origin = unknown>
  * internal `ShapeOf`). */
 export type TreeShapeOf<T> =
   T extends TypedTree<infer TS, infer _Origin> ? TS : FormShape
+
+/** The origin (`node.facts.origin.schema` type) carried by a tree (ADR 033 §4). */
+export type OriginOf<T> = T extends GroupNode<infer S> ? S : unknown
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Widget-override threading (bd bh7.8) — closing the `overrideWidgets` desync.
+//
+// `overrideWidgets(map)` (present.ts) re-presents matched leaves at RUNTIME; the
+// SAME `const` map re-narrows the typed control at COMPILE time. The seam that
+// carries the map from the runtime call to the type layer is a phantom brand on
+// the returned resolver, threaded by `useFormTree` into the presented `form`'s
+// `FormShape` brand — so a consumer who types off `form` (the actually-rendered
+// tree) can no longer desync from what renders. Because a `FormShape.fields[P]`
+// already carries `widget` and React derives the control lazily from it,
+// overriding widgets is a NEUTRAL transform on the shape (no front-end import).
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** A per-path `path → WidgetName` override map (the `overrideWidgets` argument). */
+export type WidgetOverrideMap = Readonly<Record<string, WidgetName>>
+
+// TYPE TOUR — a phantom on a FUNCTION type. `overrideWidgets` returns a
+// `PresentationResolver` (a function) that ALSO carries the map type in an
+// optional, never-emitted symbol property. Optional so the runtime value (a plain
+// function) still satisfies it; the property exists ONLY so `WidgetOverridesOf`
+// can read the map back off the resolver a consumer passed to `useFormTree`.
+declare const WIDGET_OVERRIDES: unique symbol
+
+/** A {@link WidgetOverrideMap}-carrying `PresentationResolver` — the typed return
+ * of `overrideWidgets(map)`. The map rides in a phantom (never present at runtime),
+ * so this is an ordinary resolver everywhere the runtime looks. */
+export type WidgetOverrideResolver<
+  S = unknown,
+  O extends WidgetOverrideMap = WidgetOverrideMap,
+> = PresentationResolver<S> & {
+  readonly [WIDGET_OVERRIDES]?: O
+}
+
+/** Recover the {@link WidgetOverrideMap} a resolver carries, or the empty map for a
+ * plain (unbranded) resolver — so a `useFormTree` caller without overrides re-brands
+ * the presented `form` with the UNCHANGED shape. */
+export type WidgetOverridesOf<R> = R extends {
+  readonly [WIDGET_OVERRIDES]?: infer O
+}
+  ? [O] extends [WidgetOverrideMap]
+    ? O
+    : Record<never, WidgetName>
+  : Record<never, WidgetName>
+
+/** Re-narrow a {@link FormShape} by a widget-override map: each field path in `O`
+ * takes `O[P]` as its widget (everything else unchanged), so the lazily-derived
+ * `Control` re-narrows to the OVERRIDDEN archetype — matching what the runtime
+ * `overrideWidgets(O)` resolver renders. Groups/arrays are untouched (widgets are a
+ * field concern). An empty `O` is the identity transform. */
+export type ApplyWidgetOverrides<
+  TS extends FormShape,
+  O extends WidgetOverrideMap,
+> = {
+  fields: {
+    [P in keyof TS['fields']]: {
+      value: TS['fields'][P]['value']
+      // `& WidgetName` keeps this provably a `WidgetName` for the `FormShape`
+      // constraint even while `O`/`TS` are still abstract type params.
+      widget: (P extends keyof O ? O[P] : TS['fields'][P]['widget']) &
+        WidgetName
+      description: TS['fields'][P]['description']
+    }
+  }
+  groups: TS['groups']
+  arrays: TS['arrays']
+}
+
+/** The tree `useFormTree` returns as `form`: the input tree's brand re-narrowed by
+ * the widget overrides its `resolvePresentation` carries (bd bh7.8). An unbranded
+ * (plain `GroupNode`) input passes through unchanged. Typing a customize binding
+ * off THIS tree (not the pre-override input) is desync-proof — it is the tree that
+ * actually renders. */
+export type OverriddenTree<T, R> =
+  T extends TypedTree<infer TS, infer Origin>
+    ? TypedTree<ApplyWidgetOverrides<TS, WidgetOverridesOf<R>>, Origin>
+    : T

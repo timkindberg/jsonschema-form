@@ -8,7 +8,7 @@
 
 import { describe, it, expect } from 'vitest'
 import { render } from 'vitest-browser-react'
-import { jsonSchemaToTree } from '@formframe/input-jsonschema'
+import { jsonSchemaToRuntimeTree } from '@formframe/input-jsonschema'
 import type { JSONSchema } from '@formframe/input-jsonschema'
 import { SchemaFields } from './renderer'
 
@@ -29,7 +29,7 @@ const schema: JSONSchema = {
 
 describe('array rendering', () => {
   it('renders the array label, its seed item, and an Add button', async () => {
-    const form = jsonSchemaToTree(schema)
+    const form = jsonSchemaToRuntimeTree(schema)
     const screen = await render(<SchemaFields form={form} />)
 
     // the array is a captioned grouping (fieldset + legend → role "group")
@@ -45,7 +45,7 @@ describe('array rendering', () => {
   })
 
   it('appends an item on Add, preserving existing items’ typed values', async () => {
-    const form = jsonSchemaToTree(schema)
+    const form = jsonSchemaToRuntimeTree(schema)
     const screen = await render(<SchemaFields form={form} />)
 
     const first = screen.getByRole('textbox', { name: 'Contact name' })
@@ -64,7 +64,7 @@ describe('array rendering', () => {
   })
 
   it('removes the clicked item, preserving the survivor’s value and re-pathing it densely', async () => {
-    const form = jsonSchemaToTree(schema)
+    const form = jsonSchemaToRuntimeTree(schema)
     const screen = await render(<SchemaFields form={form} />)
 
     await screen.getByRole('button', { name: /add/i }).click()
@@ -88,7 +88,7 @@ describe('array rendering', () => {
   })
 
   it('removes a MIDDLE item, re-pathing later survivors densely without losing values', async () => {
-    const form = jsonSchemaToTree(schema)
+    const form = jsonSchemaToRuntimeTree(schema)
     const screen = await render(<SchemaFields form={form} />)
 
     const inputs = () =>
@@ -119,7 +119,7 @@ describe('array rendering', () => {
 
 describe('dense array submission (ADR 018)', () => {
   it('submits a dense array after removing the first item', async () => {
-    const form = jsonSchemaToTree(schema)
+    const form = jsonSchemaToRuntimeTree(schema)
     let submitted: Record<string, unknown> | undefined
     const screen = await render(
       <form

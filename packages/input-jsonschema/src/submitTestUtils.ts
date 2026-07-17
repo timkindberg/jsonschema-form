@@ -3,14 +3,14 @@
 // Runs form.submit() against a mocked FormData backed by [key, value] pairs
 // (a multimap, so duplicate keys survive — matching real FormData).
 
-import { jsonSchemaToTree } from './jsonSchemaToTree'
+import { jsonSchemaToRuntimeTree } from './jsonSchemaToTree'
 import type { JSONSchema } from './types'
 
 export function submitWith(
   schema: JSONSchema,
   pairs: Array<[string, string]>
 ): Record<string, unknown> {
-  const form = jsonSchemaToTree(schema)
+  const form = jsonSchemaToRuntimeTree(schema)
   let submitted: Record<string, unknown> = {}
   const handleSubmit = form.submit((data) => {
     submitted = data

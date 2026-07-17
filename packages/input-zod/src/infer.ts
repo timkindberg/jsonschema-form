@@ -78,12 +78,18 @@ export type SchemaAt<
         : ElementOf<S>
       : unknown
 
-/** Classify a sub-schema's node kind (object/array/leaf) — the runtime `nodeType`. */
+/** Classify a sub-schema's node kind (object/array/leaf) — the runtime `nodeType`.
+ * A scalar-choice array (`z.array(z.enum(...))`) is classified `'field'` because
+ * Core collapses it to a single checkboxes/multiselect leaf at runtime (bd bh7.9,
+ * resolved); every other array stays `'array'`. Kept in lockstep with
+ * {@link DefaultWidgetAt} via {@link IsScalarChoiceArray}. */
 export type KindOf<T> =
   Unwrap<T> extends z.ZodObject<z.ZodRawShape>
     ? 'group'
     : Unwrap<T> extends z.ZodArray<z.ZodType>
-      ? 'array'
+      ? IsScalarChoiceArray<T> extends true
+        ? 'field'
+        : 'array'
       : 'field'
 
 type FieldPathFromShape<
@@ -118,13 +124,15 @@ type FieldPathFromSchema<
     : Unwrap<T> extends z.ZodArray<infer El>
       ? Prefix extends ''
         ? never
-        :
-            | IndexedArrayPrefix<Prefix>
-            | FieldPathFromSchema<
-                El,
-                IndexedArrayPrefix<Prefix>,
-                NextDepth<Depth>
-              >
+        : IsScalarChoiceArray<T> extends true
+          ? never
+          :
+              | IndexedArrayPrefix<Prefix>
+              | FieldPathFromSchema<
+                  El,
+                  IndexedArrayPrefix<Prefix>,
+                  NextDepth<Depth>
+                >
       : never
 
 type AllPaths<S> = FieldPath<S> & string
@@ -178,16 +186,36 @@ type EnumMemberCount<T> =
     ? UnionToTuple<z.infer<Unwrap<T>>>['length']
     : never
 
-/** The DEFAULT widget a path resolves to (Stage A) — an enum splits radio (≤5)
- * vs select (>5) on Core's `OPTION_COUNT_THRESHOLD`; otherwise a plain input. */
-export type DefaultWidgetAt<S, P extends string> =
-  SchemaAt<S, P> extends z.ZodType
+/** The member count of a scalar-choice array's element enum (`z.array(z.enum(...))`),
+ * else `never`. Mirrors `compile.ts` `readChoices(elementInner)`: an array of a Zod
+ * enum self-identifies as `choices` and Core collapses it to ONE checkboxes(≤5) /
+ * multiselect(>5) leaf at runtime. Kept in lockstep with {@link KindOf}. */
+type ArrayChoiceCount<T> =
+  Unwrap<T> extends z.ZodArray<infer El> ? EnumMemberCount<El> : never
+
+/** Whether `T` is a scalar-choice array (Core collapses it to one leaf → a field). */
+type IsScalarChoiceArray<T> = [ArrayChoiceCount<T>] extends [never]
+  ? false
+  : true
+
+/** The DEFAULT widget a path resolves to (Stage A) — a scalar-choice ARRAY splits
+ * checkboxes (≤5) vs multiselect (>5); a scalar enum splits radio (≤5) vs select
+ * (>5) on Core's `OPTION_COUNT_THRESHOLD`; otherwise a plain input. The array
+ * branch is kept in lockstep with {@link KindOf} (both keyed on
+ * {@link IsScalarChoiceArray}) so widget and node kind never disagree (bd bh7.9). */
+export type DefaultWidgetAt<S, P extends string> = [
+  ArrayChoiceCount<SchemaAt<S, P>>,
+] extends [never]
+  ? SchemaAt<S, P> extends z.ZodType
     ? [EnumMemberCount<SchemaAt<S, P>>] extends [never]
       ? 'input'
       : AtMost5<EnumMemberCount<SchemaAt<S, P>>> extends true
         ? 'radio'
         : 'select'
     : 'input'
+  : AtMost5<ArrayChoiceCount<SchemaAt<S, P>>> extends true
+    ? 'checkboxes'
+    : 'multiselect'
 
 // ── Front-end-AGNOSTIC composition (identical to input-jsonschema; a candidate
 //    to hoist into a shared layer per bd jsonschema-form-bh7.3) ───────────────
@@ -273,10 +301,11 @@ export type DescriptionStateOf<S, P extends string> = [S, P] extends [
  * ~6 instantiations/path, no measurable check-time impact — the eager half is
  * cheap and the widget→control→parts composition stays lazy in Core.
  *
- * LIMITATION — types reflect the DEFAULT presentation (bd bh7.8): `widget` uses
- * `NoOverrides`, so re-presenting with `overrideWidgets` can desync the typed
- * control from what renders. Same caveat as the JSON Schema `FormShapeOf`; treat
- * this as "default presentation only" for now.
+ * OVERRIDES (bd bh7.8, resolved): `FormShapeOf<S>` resolves `widget` with
+ * `NoOverrides` (the DEFAULT presentation `zodToTree` returns). When you re-present
+ * with `overrideWidgets(map)` via `useFormTree`, the hook threads that `const` map
+ * into the returned `form`'s brand, so typing off `form` re-narrows the control to
+ * the OVERRIDDEN widget — no desync. Same resolution as the JSON Schema sister.
  */
 export type FormShapeOf<S> = {
   fields: {

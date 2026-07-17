@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { GroupNode } from '@formframe/core'
-import { jsonSchemaToTree } from './jsonSchemaToTree'
+import { jsonSchemaToRuntimeTree } from './jsonSchemaToTree'
 import type { JSONSchema } from './types'
 // The field control is a single discriminated slot now (ADR 029 §5, v60); these
 // shared helpers narrow `control.kind` to reach archetype-specific attrs/options.
@@ -17,7 +17,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
 
       expect(form.nodeType).toBe('group')
       expect(form.path).toBe('')
@@ -35,17 +35,17 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
 
       expect(form.children).toHaveLength(3)
       expect(form.getAllFields()).toHaveLength(3)
     })
 
     it('throws error for boolean schemas', () => {
-      expect(() => jsonSchemaToTree(true)).toThrow(
+      expect(() => jsonSchemaToRuntimeTree(true)).toThrow(
         'Boolean schemas are not yet supported'
       )
-      expect(() => jsonSchemaToTree(false)).toThrow(
+      expect(() => jsonSchemaToRuntimeTree(false)).toThrow(
         'Boolean schemas are not yet supported'
       )
     })
@@ -60,7 +60,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const field = form.getField('name')
 
       expect(field?.parts.label.text).toBe('Full Name')
@@ -74,7 +74,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const field = form.getField('email')
 
       expect(field?.parts.description?.text).toBe('Your email address')
@@ -90,7 +90,7 @@ describe('jsonSchemaToTree', () => {
         required: ['name'],
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const nameField = form.getField('name')
       const emailField = form.getField('email')
 
@@ -108,7 +108,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const field = form.getField('name')
 
       expect(inputCtl(field).attrs.type).toBe('text')
@@ -122,7 +122,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const field = form.getField('email')
 
       expect(inputCtl(field).attrs.type).toBe('email')
@@ -136,7 +136,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const field = form.getField('age')
 
       expect(inputCtl(field).attrs.type).toBe('number')
@@ -150,7 +150,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const field = form.getField('subscribe')
 
       expect(inputCtl(field).attrs.type).toBe('checkbox')
@@ -165,7 +165,7 @@ describe('jsonSchemaToTree', () => {
         required: ['name'],
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const field = form.getField('name')
 
       expect(inputCtl(field).attrs.required).toBe(true)
@@ -179,7 +179,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const field = form.getField('age')
 
       expect(inputCtl(field).attrs.min).toBe(0)
@@ -194,7 +194,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const field = form.getField('username')
 
       expect(inputCtl(field).attrs.minLength).toBe(3)
@@ -209,7 +209,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const field = form.getField('zipcode')
 
       expect(inputCtl(field).attrs.pattern).toBe('^[0-9]{5}$')
@@ -232,7 +232,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
 
       expect(form.children).toHaveLength(1)
       expect(form.children[0].nodeType).toBe('group')
@@ -256,7 +256,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const street = form.getField('address.street')
       const city = form.getField('address.city')
 
@@ -279,7 +279,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const street = form.getField('address.street')
       const city = form.getField('address.city')
 
@@ -301,7 +301,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const group = form.children[0] as GroupNode
 
       expect(group.children).toHaveLength(2)
@@ -322,7 +322,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const addressGroup = form.children[0] as GroupNode
 
       // Query relative to the group
@@ -344,7 +344,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const nameField = form.getField('name')
       const emailField = form.getField('email')
 
@@ -360,7 +360,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const field = form.getField('nonexistent')
 
       expect(field).toBeUndefined()
@@ -381,7 +381,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const allFields = form.getAllFields()
 
       expect(allFields).toHaveLength(3)
@@ -406,7 +406,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const allFields = form.getAllFields()
 
       expect(allFields.every((f) => f.nodeType === 'field')).toBe(true)
@@ -436,7 +436,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const addressGroup = form.children.find(
         (c) => c.path === 'address'
       ) as GroupNode
@@ -471,7 +471,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const json = form.toJSON()
 
       expect(() => JSON.stringify(json)).not.toThrow()
@@ -488,7 +488,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const json = form.toJSON()
       const jsonString = JSON.stringify(json)
 
@@ -513,7 +513,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const nameField = form.getField('name')
       const addressGroup = form.children.find((c) => c.path === 'address')
 
@@ -536,7 +536,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const nameField = form.getField('name')
       const streetField = form.getField('address.street')
 
@@ -554,7 +554,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const nameField = form.getField('name')
       const emailField = form.getField('email')
 
@@ -580,7 +580,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const nameField = form.getField('name')
       const streetField = form.getField('address.street')
 
@@ -601,7 +601,7 @@ describe('jsonSchemaToTree', () => {
           },
         }
 
-        const form = jsonSchemaToTree(schema)
+        const form = jsonSchemaToRuntimeTree(schema)
         const field = form.getField('name')
 
         expect(field?.parts.container).toEqual({
@@ -618,7 +618,7 @@ describe('jsonSchemaToTree', () => {
           required: ['name'],
         }
 
-        const form = jsonSchemaToTree(schema)
+        const form = jsonSchemaToRuntimeTree(schema)
         const field = form.getField('name')
 
         expect(field?.parts.label).toEqual({
@@ -639,7 +639,7 @@ describe('jsonSchemaToTree', () => {
           },
         }
 
-        const form = jsonSchemaToTree(schema)
+        const form = jsonSchemaToRuntimeTree(schema)
         const field = form.getField('email')
 
         expect(field?.parts.description).toEqual({
@@ -655,7 +655,7 @@ describe('jsonSchemaToTree', () => {
           },
         }
 
-        const form = jsonSchemaToTree(schema)
+        const form = jsonSchemaToRuntimeTree(schema)
         const field = form.getField('name')
 
         expect(field?.parts.description).toBeUndefined()
@@ -669,7 +669,7 @@ describe('jsonSchemaToTree', () => {
           },
         }
 
-        const form = jsonSchemaToTree(schema)
+        const form = jsonSchemaToRuntimeTree(schema)
         const field = form.getField('age')
 
         expect(inputCtl(field)).toEqual({
@@ -699,7 +699,7 @@ describe('jsonSchemaToTree', () => {
           },
         }
 
-        const form = jsonSchemaToTree(schema)
+        const form = jsonSchemaToRuntimeTree(schema)
         const addressGroup = form.children.find(
           (c) => c.path === 'address'
         ) as GroupNode
@@ -723,7 +723,7 @@ describe('jsonSchemaToTree', () => {
           },
         }
 
-        const form = jsonSchemaToTree(schema)
+        const form = jsonSchemaToRuntimeTree(schema)
         const addressGroup = form.children.find(
           (c) => c.path === 'address'
         ) as GroupNode
@@ -746,7 +746,7 @@ describe('jsonSchemaToTree', () => {
           },
         }
 
-        const form = jsonSchemaToTree(schema)
+        const form = jsonSchemaToRuntimeTree(schema)
         const addressGroup = form.children.find(
           (c) => c.path === 'address'
         ) as GroupNode
@@ -768,7 +768,7 @@ describe('jsonSchemaToTree', () => {
           },
         }
 
-        const form = jsonSchemaToTree(schema)
+        const form = jsonSchemaToRuntimeTree(schema)
         const addressGroup = form.children.find(
           (c) => c.path === 'address'
         ) as GroupNode
@@ -793,7 +793,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const field = form.getField('color')
 
       expect(field?.nodeType).toBe('field')
@@ -815,7 +815,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const field = form.getField('size')
 
       expect(field?.facts.choices).toEqual([
@@ -839,7 +839,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const field = form.getField('size')
 
       expect(field?.facts.choices).toEqual([
@@ -863,7 +863,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const field = form.getField('status')
 
       expect(field?.widget).toBe('radio')
@@ -886,7 +886,7 @@ describe('jsonSchemaToTree', () => {
         required: ['country'],
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const field = form.getField('country')
 
       expect(field?.facts.constraints.required).toBe(true)
@@ -906,7 +906,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const allFields = form.getAllFields()
 
       expect(allFields).toHaveLength(4)
@@ -939,7 +939,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const methodField = form.getField('shipping.method')
       const priorityField = form.getField('shipping.priority')
 
@@ -965,7 +965,7 @@ describe('jsonSchemaToTree', () => {
         required: ['status'],
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const field = form.getField('status')
 
       expect(selectCtl(field)).toEqual({
@@ -997,7 +997,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const field = form.getField('field')
 
       expect(field?.widget).toBe('input')
@@ -1016,7 +1016,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const field = form.getField('color')
 
       // Widget is the resolved name; the render archetype is `control.kind` — the
@@ -1034,7 +1034,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const field = form.getField('name')
 
       expect(field?.widget).toBe('input')
@@ -1056,7 +1056,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const field = form.getField('terms')
 
       expect(field?.nodeType).toBe('field')
@@ -1076,7 +1076,7 @@ describe('jsonSchemaToTree', () => {
         required: ['terms'],
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const field = form.getField('terms')
 
       expect(field?.facts.constraints.required).toBe(true)
@@ -1095,7 +1095,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const allFields = form.getAllFields()
 
       expect(allFields).toHaveLength(4)
@@ -1118,7 +1118,7 @@ describe('jsonSchemaToTree', () => {
         required: ['notifications'],
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const field = form.getField('notifications')
 
       expect(inputCtl(field)).toEqual({
@@ -1164,7 +1164,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const emailField = form.getField('preferences.emailNotifications')
       const smsField = form.getField('preferences.smsNotifications')
 
@@ -1184,7 +1184,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const handler = form.submit(() => {})
 
       expect(typeof handler).toBe('function')
@@ -1203,7 +1203,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const addressNode = form.children.find(
         (child) => child.path === 'address'
       )
@@ -1229,7 +1229,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       let submittedData: Record<string, unknown> | null = null
       const handleSubmit = form.submit((data) => {
         submittedData = data
@@ -1280,7 +1280,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       let submittedData: Record<string, unknown> | null = null
       const handleSubmit = form.submit((data) => {
         submittedData = data
@@ -1339,7 +1339,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       let submittedData: Record<string, unknown> | null = null
       const handleSubmit = form.submit((data) => {
         submittedData = data
@@ -1391,7 +1391,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       let submittedData: Record<string, unknown> | null = null
       const handleSubmit = form.submit((data) => {
         submittedData = data
@@ -1440,7 +1440,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       let submittedData: Record<string, unknown> | null = null
       const handleSubmit = form.submit((data) => {
         submittedData = data
@@ -1485,7 +1485,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       let submittedData: Record<string, unknown> | null = null
       const handleSubmit = form.submit((data) => {
         submittedData = data
@@ -1529,7 +1529,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       let submittedData: Record<string, unknown> | null = null
       const handleSubmit = form.submit((data) => {
         submittedData = data
@@ -1580,7 +1580,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       let submittedData: Record<string, unknown> | null = null
       const handleSubmit = form.submit((data) => {
         submittedData = data
@@ -1766,7 +1766,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const skillsField = form.children.find((child) => child.path === 'skills')
 
       expect(skillsField?.nodeType).toBe('field')
@@ -1805,7 +1805,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const colorsField = form.children.find((child) => child.path === 'colors')
 
       expect(colorsField?.nodeType).toBe('field')
@@ -1837,7 +1837,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const skillsField = form.children.find((child) => child.path === 'skills')
 
       expect(skillsField?.nodeType).toBe('field')
@@ -1867,7 +1867,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const addressesNode = form.children.find(
         (child) => child.path === 'addresses'
       )
@@ -1899,7 +1899,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const addressesNode = form.children.find(
         (child) => child.path === 'addresses'
       )
@@ -1928,7 +1928,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const addressesNode = form.children.find(
         (child) => child.path === 'addresses'
       )
@@ -1953,7 +1953,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const hobbiesNode = form.children.find(
         (child) => child.path === 'hobbies'
       )
@@ -1988,7 +1988,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const todosNode = form.children.find((child) => child.path === 'todos')
 
       expect(todosNode?.isArray).toBe(true)
@@ -2030,8 +2030,8 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const inlinedTree = jsonSchemaToTree(inlined)
-      const refTree = jsonSchemaToTree(withRefs)
+      const inlinedTree = jsonSchemaToRuntimeTree(inlined)
+      const refTree = jsonSchemaToRuntimeTree(withRefs)
 
       expect(refTree.toJSON()).toEqual(inlinedTree.toJSON())
     })
@@ -2047,7 +2047,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const field = form.getField('nickname')
 
       expect(field?.parts.label.text).toBe('Nickname')
@@ -2080,8 +2080,8 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const inlinedTree = jsonSchemaToTree(inlined)
-      const refTree = jsonSchemaToTree(withRefs)
+      const inlinedTree = jsonSchemaToRuntimeTree(inlined)
+      const refTree = jsonSchemaToRuntimeTree(withRefs)
 
       expect(refTree.toJSON()).toEqual(inlinedTree.toJSON())
     })
@@ -2098,7 +2098,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const field = form.getField('street')
 
       expect(field?.parts.label.text).toBe('Street')
@@ -2137,8 +2137,8 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const inlinedTree = jsonSchemaToTree(inlined)
-      const refTree = jsonSchemaToTree(withRefs)
+      const inlinedTree = jsonSchemaToRuntimeTree(inlined)
+      const refTree = jsonSchemaToRuntimeTree(withRefs)
 
       expect(refTree.toJSON()).toEqual(inlinedTree.toJSON())
     })
@@ -2157,7 +2157,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const field = form.getField('label')
 
       expect(field?.parts.label.text).toBe('Override Title')
@@ -2175,7 +2175,9 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      expect(() => jsonSchemaToTree(schema)).toThrow(/Circular \$ref detected/)
+      expect(() => jsonSchemaToRuntimeTree(schema)).toThrow(
+        /Circular \$ref detected/
+      )
     })
 
     it('throws on external $ref', () => {
@@ -2186,7 +2188,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      expect(() => jsonSchemaToTree(schema)).toThrow(
+      expect(() => jsonSchemaToRuntimeTree(schema)).toThrow(
         /External \$ref is not supported/
       )
     })
@@ -2200,7 +2202,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const aliasField = form.getField('alias')
 
       expect(aliasField?.parts.label.text).toBe('Name')
@@ -2218,7 +2220,7 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      const form = jsonSchemaToTree(schema)
+      const form = jsonSchemaToRuntimeTree(schema)
       const field = form.getField('note')
 
       expect(field?.parts.label.text).toBe('Slash and tilde')
@@ -2232,7 +2234,9 @@ describe('jsonSchemaToTree', () => {
         },
       }
 
-      expect(() => jsonSchemaToTree(schema)).toThrow(/\$ref target not found/)
+      expect(() => jsonSchemaToRuntimeTree(schema)).toThrow(
+        /\$ref target not found/
+      )
     })
   })
 })

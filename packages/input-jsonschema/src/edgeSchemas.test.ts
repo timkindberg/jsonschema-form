@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { jsonSchemaToTree } from './jsonSchemaToTree'
+import { jsonSchemaToRuntimeTree } from './jsonSchemaToTree'
 import type { JSONSchema } from './types'
 import { inputCtl, choicegroupCtl } from './controlTestUtils'
 import { submitWith } from './submitTestUtils'
@@ -14,7 +14,7 @@ describe('edge schema robustness', () => {
       },
     }
 
-    const form = jsonSchemaToTree(schema)
+    const form = jsonSchemaToRuntimeTree(schema)
     const field = form.getField('field')
 
     expect(field?.widget).toBe('input')
@@ -37,7 +37,7 @@ describe('edge schema robustness', () => {
       },
     }
 
-    const form = jsonSchemaToTree(schema)
+    const form = jsonSchemaToRuntimeTree(schema)
     const field = form.getField('plan')
 
     expect(field?.widget).toBe('radio')
@@ -72,7 +72,7 @@ describe('edge schema robustness', () => {
       },
     }
 
-    const form = jsonSchemaToTree(schema)
+    const form = jsonSchemaToRuntimeTree(schema)
     const field = form.getField('value')
 
     expect(field?.widget).toBe('radio')
@@ -92,7 +92,7 @@ describe('edge schema robustness', () => {
       },
     }
 
-    const form = jsonSchemaToTree(schema)
+    const form = jsonSchemaToRuntimeTree(schema)
     const mode = form.getField('mode')
     const label = form.getField('label')
 
@@ -114,7 +114,7 @@ describe('edge schema robustness', () => {
       },
     }
 
-    const form = jsonSchemaToTree(schema)
+    const form = jsonSchemaToRuntimeTree(schema)
     const field = form.getField('amount')
 
     expect(field?.widget).toBe('input')
@@ -132,7 +132,7 @@ describe('edge schema robustness', () => {
       },
     }
 
-    const form = jsonSchemaToTree(schema)
+    const form = jsonSchemaToRuntimeTree(schema)
 
     expect(form.children).toHaveLength(2)
     expect(form.getField('name')?.widget).toBe('input')

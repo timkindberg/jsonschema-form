@@ -11,7 +11,7 @@ import type {
   FieldNode,
   TreeShapeOf,
 } from '@formframe/core'
-import { jsonSchemaToTree } from './jsonSchemaToTree'
+import { jsonSchemaToRuntimeTree } from './jsonSchemaToTree'
 import type { JSONSchema, JSONSchemaObject } from './types'
 
 const schema: JSONSchema = {
@@ -32,7 +32,7 @@ const schema: JSONSchema = {
 
 describe('jsonSchemaToTree pins S = JSONSchemaObject', () => {
   it('returns a GroupNode<JSONSchemaObject> root, branded with a FormShape (ADR 048)', () => {
-    const tree = jsonSchemaToTree(schema)
+    const tree = jsonSchemaToRuntimeTree(schema)
     // Still a GroupNode<JSONSchemaObject> structurally — origin threading (wo8)
     // is preserved through the `TypedTree` brand's Origin parameter …
     expectTypeOf(tree).toExtend<GroupNode<JSONSchemaObject>>()
@@ -41,7 +41,7 @@ describe('jsonSchemaToTree pins S = JSONSchemaObject', () => {
   })
 
   it('a deep leaf carries JSONSchemaObject — uniform, NOT a narrowed subschema', () => {
-    const tree = jsonSchemaToTree(schema)
+    const tree = jsonSchemaToRuntimeTree(schema)
     const leaf = tree.getField('user.address.zip')
     expectTypeOf(leaf).toEqualTypeOf<FieldNode<JSONSchemaObject> | undefined>()
     // The payoff of wo8: origin.schema is the front-end's schema type, not
@@ -54,7 +54,7 @@ describe('jsonSchemaToTree pins S = JSONSchemaObject', () => {
   })
 
   it('walk handlers see JSONSchemaObject on origin.schema, not unknown', () => {
-    const tree = jsonSchemaToTree(schema)
+    const tree = jsonSchemaToRuntimeTree(schema)
     tree.walk<void>({
       field: (node) => {
         expectTypeOf(node.facts.origin.schema).toEqualTypeOf<JSONSchemaObject>()

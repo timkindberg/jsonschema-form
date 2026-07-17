@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { jsonSchemaToTree } from '@formframe/input-jsonschema'
+import { jsonSchemaToRuntimeTree } from '@formframe/input-jsonschema'
 import type { JSONSchema } from '@formframe/input-jsonschema'
 import {
   renderToString,
@@ -31,7 +31,7 @@ const schema: JSONSchema = {
 }
 
 describe('renderToString — default rendering', () => {
-  const form = jsonSchemaToTree(schema)
+  const form = jsonSchemaToRuntimeTree(schema)
   const html = renderToString(form)
 
   it('renders content only — no form chrome (consumer owns <form> + submit)', () => {
@@ -63,7 +63,7 @@ describe('renderToString — default rendering', () => {
   })
 
   it('renders a nameless group as a plain div, not a fieldset', () => {
-    const nameless = jsonSchemaToTree({
+    const nameless = jsonSchemaToRuntimeTree({
       type: 'object',
       properties: {
         meta: {
@@ -84,7 +84,7 @@ describe('renderToString — default rendering', () => {
 })
 
 describe('renderToString — continuation model', () => {
-  const form = jsonSchemaToTree(schema)
+  const form = jsonSchemaToRuntimeTree(schema)
 
   it('renderNode hijacks one node; the rest stay default', () => {
     const html = renderToString(form, {
@@ -148,7 +148,7 @@ describe('renderToString — continuation model', () => {
 })
 
 describe('createRenderer — the floor (ADR 013)', () => {
-  const form = jsonSchemaToTree(schema)
+  const form = jsonSchemaToRuntimeTree(schema)
 
   it('an empty partial set renders diagnostic markers, not defaults', () => {
     const render = createRenderer({})

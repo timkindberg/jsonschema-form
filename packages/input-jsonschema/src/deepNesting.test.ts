@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { jsonSchemaToTree } from './jsonSchemaToTree'
+import { jsonSchemaToRuntimeTree } from './jsonSchemaToTree'
 import type { JSONSchema } from './types'
 import { assertArrayNode, assertGroupNode } from './nodeTestUtils'
 import { submitWith } from './submitTestUtils'
@@ -67,7 +67,7 @@ describe('deep nesting robustness', () => {
   }
 
   it('resolves deeply nested fields via getField relative paths', () => {
-    const form = jsonSchemaToTree(deepSchema)
+    const form = jsonSchemaToRuntimeTree(deepSchema)
     const leaf = form.getField(deepLeafPath)
 
     expect(leaf?.nodeType).toBe('field')
@@ -76,14 +76,14 @@ describe('deep nesting robustness', () => {
   })
 
   it('counts all leaf fields in deep nesting via getAllFields', () => {
-    const form = jsonSchemaToTree(deepSchema)
+    const form = jsonSchemaToRuntimeTree(deepSchema)
 
     expect(form.getAllFields()).toHaveLength(1)
     expect(form.getAllFields()[0].path).toBe(deepLeafPath)
   })
 
   it('resolves array-of-objects fields nested inside groups', () => {
-    const form = jsonSchemaToTree(nestedArraySchema)
+    const form = jsonSchemaToRuntimeTree(nestedArraySchema)
     const org = form.children.find((c) => c.path === 'org')
     assertGroupNode(org)
 
@@ -206,49 +206,49 @@ describe('query surface traverses arrays (ADR 032)', () => {
   }
 
   it('resolves an array-item leaf by numeric index from the root', () => {
-    const form = jsonSchemaToTree(teamSchema)
+    const form = jsonSchemaToRuntimeTree(teamSchema)
     expect(form.getField('members.0.name')?.path).toBe('members.0.name')
     expect(form.getField('members.1.name')?.path).toBe('members.1.name')
   })
 
   it('resolves through a group nested inside an array item', () => {
-    const form = jsonSchemaToTree(teamSchema)
+    const form = jsonSchemaToRuntimeTree(teamSchema)
     expect(form.getField('members.0.address.city')?.path).toBe(
       'members.0.address.city'
     )
   })
 
   it('resolves a primitive dynamic-array element by index', () => {
-    const form = jsonSchemaToTree(teamSchema)
+    const form = jsonSchemaToRuntimeTree(teamSchema)
     const tag0 = form.getField('tags.0')
     expect(tag0?.path).toBe('tags.0')
     expect(tag0?.nodeType).toBe('field')
   })
 
   it('chains numeric indices through nested arrays', () => {
-    const form = jsonSchemaToTree(matrixSchema)
+    const form = jsonSchemaToRuntimeTree(matrixSchema)
     expect(form.getField('teams.0.members.1.name')?.path).toBe(
       'teams.0.members.1.name'
     )
   })
 
   it('returns undefined for an out-of-range index (item not instantiated)', () => {
-    const form = jsonSchemaToTree(teamSchema)
+    const form = jsonSchemaToRuntimeTree(teamSchema)
     expect(form.getField('members.5.name')).toBeUndefined()
   })
 
   it('returns undefined for a non-numeric segment where an index is expected', () => {
-    const form = jsonSchemaToTree(teamSchema)
+    const form = jsonSchemaToRuntimeTree(teamSchema)
     expect(form.getField('members.x.name')).toBeUndefined()
   })
 
   it('returns undefined for the array container path itself (not a leaf)', () => {
-    const form = jsonSchemaToTree(teamSchema)
+    const form = jsonSchemaToRuntimeTree(teamSchema)
     expect(form.getField('members')).toBeUndefined()
   })
 
   it('getAllFields includes every array-item leaf (≡ walk)', () => {
-    const form = jsonSchemaToTree(teamSchema)
+    const form = jsonSchemaToRuntimeTree(teamSchema)
 
     const viaGetAll = form
       .getAllFields()

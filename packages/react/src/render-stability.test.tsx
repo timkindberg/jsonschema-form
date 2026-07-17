@@ -10,7 +10,7 @@
 import { describe, it, expect } from 'vitest'
 import { render } from 'vitest-browser-react'
 import { useState } from 'react'
-import { jsonSchemaToTree } from '@formframe/input-jsonschema'
+import { jsonSchemaToRuntimeTree } from '@formframe/input-jsonschema'
 import type { JSONSchema } from '@formframe/input-jsonschema'
 import { SchemaFields } from './renderer'
 
@@ -23,7 +23,7 @@ const schema: JSONSchema = {
 
 describe('render stability', () => {
   it('an unrelated parent re-render preserves typed input values (no remount)', async () => {
-    const form = jsonSchemaToTree(schema)
+    const form = jsonSchemaToRuntimeTree(schema)
 
     function Parent() {
       const [n, setN] = useState(0)
@@ -61,7 +61,7 @@ describe('render stability', () => {
   // keeps the uncontrolled input mounted; mounting a per-render closure as a
   // fresh component type would remount it and discard the value (ADR 016/017).
   it('an inlined renderNode (new identity each render) does not remount fields', async () => {
-    const form = jsonSchemaToTree(schema)
+    const form = jsonSchemaToRuntimeTree(schema)
 
     function Parent() {
       const [n, setN] = useState(0)

@@ -18,6 +18,7 @@ import {
 } from '@formframe/core'
 import { zodToTree } from './zodToTree'
 import type {
+  ArrayPaths,
   ControlAt,
   ControlKindAt,
   DefaultWidgetAt,
@@ -41,6 +42,13 @@ const matrix = z.object({
   // a description set via `.describe()` — invisible to the static type
   bio: z.string().describe('About you'),
   address: z.object({ street: z.string() }),
+  // scalar-choice array of ≤5 → collapses to ONE checkboxes leaf → choicegroup.
+  // A FIELD path (bd bh7.9), NOT an array — Core folds it to a single control.
+  roles: z.array(z.enum(['admin', 'editor', 'viewer'])),
+  // scalar-choice array of >5 → collapses to ONE multiselect leaf → select.
+  regions: z.array(z.enum(['na', 'eu', 'apac', 'latam', 'mea', 'anz'])),
+  // open-ended array (no element choices) → stays a genuine array path.
+  notes: z.array(z.string()),
 })
 
 type S = typeof matrix
@@ -51,7 +59,14 @@ describe('ControlAt — Stage A type mirror ↔ runtime present() (Zod, ADR 047 
   const tree = zodToTree(matrix)
 
   const cases: {
-    path: 'name' | 'age' | 'plan' | 'color' | 'address.street'
+    path:
+      | 'name'
+      | 'age'
+      | 'plan'
+      | 'color'
+      | 'address.street'
+      | 'roles'
+      | 'regions'
     kind: FieldControl['kind']
   }[] = [
     { path: 'name', kind: 'input' },
@@ -59,6 +74,9 @@ describe('ControlAt — Stage A type mirror ↔ runtime present() (Zod, ADR 047 
     { path: 'plan', kind: 'choicegroup' },
     { path: 'color', kind: 'select' },
     { path: 'address.street', kind: 'input' },
+    // scalar-choice arrays collapse to a single leaf control at runtime (bd bh7.9).
+    { path: 'roles', kind: 'choicegroup' },
+    { path: 'regions', kind: 'select' },
   ]
 
   it('runtime control kinds match the default rule', () => {
@@ -84,6 +102,28 @@ describe('ControlAt — Stage A type mirror ↔ runtime present() (Zod, ADR 047 
     expectTypeOf<ControlKindAt<S, 'address.street'>>().toEqualTypeOf<
       KindOfControl<'input'>
     >()
+    // Scalar-choice arrays collapse to a leaf: ≤5 → checkboxes → choicegroup,
+    // >5 → multiselect → select. Kind and widget stay in lockstep (bd bh7.9).
+    expectTypeOf<ControlKindAt<S, 'roles'>>().toEqualTypeOf<
+      KindOfControl<'choicegroup'>
+    >()
+    expectTypeOf<ControlKindAt<S, 'regions'>>().toEqualTypeOf<
+      KindOfControl<'select'>
+    >()
+  })
+
+  it('scalar-choice arrays are field paths, open-ended arrays stay array paths (bd bh7.9)', () => {
+    expectTypeOf<'roles'>().toExtend<FieldPaths<S>>()
+    expectTypeOf<'regions'>().toExtend<FieldPaths<S>>()
+    expectTypeOf<'roles'>().not.toExtend<ArrayPaths<S>>()
+    expectTypeOf<'notes'>().toExtend<ArrayPaths<S>>()
+    expectTypeOf<'notes'>().not.toExtend<FieldPaths<S>>()
+    // A collapsed scalar-choice array emits NO indexed item path (bd bh7.9). (Zod's
+    // indexed-item path resolution for open-ended arrays is a separate pre-existing
+    // quirk, so `notes.${number}` isn't asserted here — see the JSON Schema sister.)
+    expectTypeOf<`roles.${number}`>().not.toExtend<FieldPaths<S>>()
+    expectTypeOf<DefaultWidgetAt<S, 'roles'>>().toEqualTypeOf<'checkboxes'>()
+    expectTypeOf<DefaultWidgetAt<S, 'regions'>>().toEqualTypeOf<'multiselect'>()
   })
 
   it('ControlAt pre-narrows the FieldControl union member', () => {

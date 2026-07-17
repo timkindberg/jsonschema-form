@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { describe, it, expect } from 'vitest'
 import { render } from 'vitest-browser-react'
-import { jsonSchemaToTree } from '@formframe/input-jsonschema'
+import { jsonSchemaToRuntimeTree } from '@formframe/input-jsonschema'
 import type { JSONSchema } from '@formframe/input-jsonschema'
 import { useFormTree } from './useFormTree'
 
@@ -10,7 +10,7 @@ import { useFormTree } from './useFormTree'
 // these tests place it themselves where a submit is needed.
 
 function useJsonSchemaTree(schema: JSONSchema) {
-  const tree = useMemo(() => jsonSchemaToTree(schema), [schema])
+  const tree = useMemo(() => jsonSchemaToRuntimeTree(schema), [schema])
   return useFormTree(tree)
 }
 

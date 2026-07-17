@@ -169,15 +169,19 @@ function LiveCustomizedForm() {
   const tree = useMemo(() => jsonSchemaToTree(schema), [])
   const validator = useMemo(() => createAjvValidator(schema), [])
   const {
+    form,
     SchemaFields: Fields,
     submit,
     revalidate,
     errors,
   } = useFormTree(tree, { validator })
-  // `useRenderNodeRules` reads the tree's `FormShape` brand to type the rules,
-  // bakes in the memo (stable resolver identity is the contract), and hides the
-  // one intrinsic cast. `tree` is a compile-time type carrier here (ADR 048).
-  const renderNode = useRenderNodeRules(tree, customizeRules)
+  // Type off `form` — the tree that ACTUALLY renders — not the pre-present input
+  // (bd bh7.8). With no `overrideWidgets` here the two brands are identical, but
+  // typing off `form` is the desync-proof habit: if you later add
+  // `resolvePresentation: overrideWidgets(map)`, the narrowed control re-narrows to
+  // match the override with no other change. `useRenderNodeRules` reads that brand
+  // to type the rules and bakes in the stable-resolver memo (ADR 048).
+  const renderNode = useRenderNodeRules(form, customizeRules)
   const [data, setData] = useState<Record<string, unknown> | null>(null)
   return (
     <form noValidate onSubmit={submit((d) => setData(d))} onInput={revalidate}>

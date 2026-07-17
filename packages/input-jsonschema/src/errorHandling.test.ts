@@ -1,14 +1,14 @@
 import { describe, it, expect } from 'vitest'
-import { jsonSchemaToTree } from './jsonSchemaToTree'
+import { jsonSchemaToRuntimeTree } from './jsonSchemaToTree'
 import type { JSONSchema } from './types'
 import { inputCtl } from './controlTestUtils'
 
 describe('error handling robustness', () => {
   it('throws for boolean root schemas', () => {
-    expect(() => jsonSchemaToTree(true)).toThrow(
+    expect(() => jsonSchemaToRuntimeTree(true)).toThrow(
       'Boolean schemas are not yet supported'
     )
-    expect(() => jsonSchemaToTree(false)).toThrow(
+    expect(() => jsonSchemaToRuntimeTree(false)).toThrow(
       'Boolean schemas are not yet supported'
     )
   })
@@ -22,7 +22,7 @@ describe('error handling robustness', () => {
       },
     }
 
-    const form = jsonSchemaToTree(schema)
+    const form = jsonSchemaToRuntimeTree(schema)
 
     expect(form.children).toHaveLength(1)
     expect(form.getField('name')?.widget).toBe('input')
@@ -54,7 +54,7 @@ describe('error handling robustness', () => {
       properties: { tags: property },
     }
 
-    expect(() => jsonSchemaToTree(schema)).toThrow(message)
+    expect(() => jsonSchemaToRuntimeTree(schema)).toThrow(message)
   })
 
   it('unknown format falls back to input with type=text', () => {
@@ -66,7 +66,7 @@ describe('error handling robustness', () => {
       },
     }
 
-    const form = jsonSchemaToTree(schema)
+    const form = jsonSchemaToRuntimeTree(schema)
     const idField = form.getField('id')
     const tokenField = form.getField('token')
 

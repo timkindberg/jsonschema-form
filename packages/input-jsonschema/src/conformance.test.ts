@@ -16,7 +16,7 @@ import {
   runInputConformance,
   type ScenarioId,
 } from '@formframe/input-conformance'
-import { jsonSchemaToTree } from './jsonSchemaToTree'
+import { jsonSchemaToRuntimeTree } from './jsonSchemaToTree'
 import type { JSONSchema } from './types'
 
 const schemas: Record<ScenarioId, JSONSchema> = {
@@ -124,4 +124,6 @@ const schemas: Record<ScenarioId, JSONSchema> = {
   },
 }
 
-runInputConformance('input-jsonschema', (id) => jsonSchemaToTree(schemas[id]))
+runInputConformance('input-jsonschema', (id) =>
+  jsonSchemaToRuntimeTree(schemas[id])
+)

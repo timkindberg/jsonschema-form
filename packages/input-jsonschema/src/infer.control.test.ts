@@ -17,11 +17,13 @@ import {
 } from '@formframe/core'
 import { jsonSchemaToTree } from './jsonSchemaToTree'
 import type {
+  ArrayPaths,
   ControlAt,
   ControlKindAt,
   DefaultWidgetAt,
   FieldPaths,
   GroupPaths,
+  HasDescription,
   ValueAt,
 } from './infer'
 
@@ -50,6 +52,29 @@ const matrix = {
       properties: { street: { type: 'string', title: 'Street' } },
       required: ['street'],
     },
+    // scalar-choice array of ≤5 → collapses to ONE checkboxes leaf → choicegroup.
+    // A FIELD path (bd bh7.9), NOT an array — Core folds it to a single control.
+    roles: {
+      type: 'array',
+      title: 'Roles',
+      items: { enum: ['admin', 'editor', 'viewer'] },
+    },
+    // scalar-choice array of >5 → collapses to ONE multiselect leaf → select.
+    regions: {
+      type: 'array',
+      title: 'Regions',
+      items: { enum: ['na', 'eu', 'apac', 'latam', 'mea', 'anz'] },
+    },
+    // open-ended array (no item choices) → stays a genuine array path.
+    notes: { type: 'array', title: 'Notes', items: { type: 'string' } },
+    // a non-empty description → runtime renders a description part → present.
+    bio: {
+      type: 'string',
+      title: 'Bio',
+      description: 'Tell us about yourself',
+    },
+    // an empty-string description → runtime `commonParts` guard drops it → absent.
+    empty: { type: 'string', title: 'Empty', description: '' },
   },
   required: ['name'],
 } as const
@@ -62,7 +87,14 @@ describe('ControlAt — Stage A type mirror ↔ runtime present() (ADR 047 §4)'
   const tree = jsonSchemaToTree(matrix)
 
   const cases: {
-    path: 'name' | 'age' | 'plan' | 'color' | 'address.street'
+    path:
+      | 'name'
+      | 'age'
+      | 'plan'
+      | 'color'
+      | 'address.street'
+      | 'roles'
+      | 'regions'
     kind: FieldControl['kind']
   }[] = [
     { path: 'name', kind: 'input' },
@@ -70,6 +102,9 @@ describe('ControlAt — Stage A type mirror ↔ runtime present() (ADR 047 §4)'
     { path: 'plan', kind: 'choicegroup' },
     { path: 'color', kind: 'select' },
     { path: 'address.street', kind: 'input' },
+    // scalar-choice arrays collapse to a single leaf control at runtime (bd bh7.9).
+    { path: 'roles', kind: 'choicegroup' },
+    { path: 'regions', kind: 'select' },
   ]
 
   it('runtime control kinds match the default rule', () => {
@@ -96,6 +131,31 @@ describe('ControlAt — Stage A type mirror ↔ runtime present() (ADR 047 §4)'
     expectTypeOf<ControlKindAt<S, 'address.street'>>().toEqualTypeOf<
       KindOfControl<'input'>
     >()
+    // Scalar-choice arrays collapse to a leaf: ≤5 → checkboxes → choicegroup,
+    // >5 → multiselect → select. Kind and widget stay in lockstep (bd bh7.9).
+    expectTypeOf<ControlKindAt<S, 'roles'>>().toEqualTypeOf<
+      KindOfControl<'choicegroup'>
+    >()
+    expectTypeOf<ControlKindAt<S, 'regions'>>().toEqualTypeOf<
+      KindOfControl<'select'>
+    >()
+  })
+
+  it('scalar-choice arrays are field paths, open-ended arrays stay array paths (bd bh7.9)', () => {
+    // A collapsed scalar-choice array is a FIELD (Core renders one control).
+    expectTypeOf<'roles'>().toExtend<FieldPaths<S>>()
+    expectTypeOf<'regions'>().toExtend<FieldPaths<S>>()
+    expectTypeOf<'roles'>().not.toExtend<ArrayPaths<S>>()
+    // An open-ended array is still an ARRAY (add/remove items), never a field.
+    expectTypeOf<'notes'>().toExtend<ArrayPaths<S>>()
+    expectTypeOf<'notes'>().not.toExtend<FieldPaths<S>>()
+    // No phantom indexed item path for the collapsed array, but the open-ended
+    // one still descends to `notes.${number}`.
+    expectTypeOf<`roles.${number}`>().not.toExtend<FieldPaths<S>>()
+    expectTypeOf<`notes.${number}`>().toExtend<FieldPaths<S>>()
+    // The default widget names match the collapsed controls.
+    expectTypeOf<DefaultWidgetAt<S, 'roles'>>().toEqualTypeOf<'checkboxes'>()
+    expectTypeOf<DefaultWidgetAt<S, 'regions'>>().toEqualTypeOf<'multiselect'>()
   })
 
   it('ControlAt pre-narrows the FieldControl union member', () => {
@@ -115,6 +175,38 @@ describe('ControlAt — Stage A type mirror ↔ runtime present() (ADR 047 §4)'
     expectTypeOf<DefaultWidgetAt<S, 'plan'>>().toEqualTypeOf<'radio'>()
     expectTypeOf<DefaultWidgetAt<S, 'color'>>().toEqualTypeOf<'select'>()
     expectTypeOf<DefaultWidgetAt<S, 'name'>>().toEqualTypeOf<'input'>()
+  })
+})
+
+describe('HasDescription tracks the runtime commonParts guard (bd bh7.9)', () => {
+  const tree = jsonSchemaToTree(matrix)
+  it('runtime renders a description part iff the schema carries a non-empty one', () => {
+    // Paired with the type assertions below: `bio` has a real description,
+    // `empty` has `''` (falsy → no part), `name` has none.
+    expect(tree.getField('bio')?.parts.description).toBeDefined()
+    expect(tree.getField('empty')?.parts.description).toBeUndefined()
+    expect(tree.getField('name')?.parts.description).toBeUndefined()
+  })
+
+  it('type: present for a non-empty literal, absent for missing OR empty-string', () => {
+    expectTypeOf<HasDescription<S, 'bio'>>().toEqualTypeOf<true>()
+    // Empty string → runtime renders no description part → absent.
+    expectTypeOf<HasDescription<S, 'empty'>>().toEqualTypeOf<false>()
+    expectTypeOf<HasDescription<S, 'name'>>().toEqualTypeOf<false>()
+    // Robust to a widened/branded/union string, not just a literal (bd bh7.9).
+    expectTypeOf<
+      HasDescription<{ properties: { a: { description: string } } }, 'a'>
+    >().toEqualTypeOf<true>()
+    expectTypeOf<
+      HasDescription<
+        { properties: { a: { description: string | undefined } } },
+        'a'
+      >
+    >().toEqualTypeOf<true>()
+    // A bare empty-string literal is the one string value that reads as absent.
+    expectTypeOf<
+      HasDescription<{ properties: { a: { description: '' } } }, 'a'>
+    >().toEqualTypeOf<false>()
   })
 })
 

@@ -10,7 +10,7 @@
 import { useMemo } from 'react'
 import { describe, it, expect } from 'vitest'
 import { render } from 'vitest-browser-react'
-import { jsonSchemaToTree } from '@formframe/input-jsonschema'
+import { jsonSchemaToRuntimeTree } from '@formframe/input-jsonschema'
 import type { JSONSchema } from '@formframe/input-jsonschema'
 import { createAjvValidator } from '@formframe/validation-ajv'
 import { useFormTree } from './useFormTree'
@@ -25,7 +25,7 @@ const schema: JSONSchema = {
     zip: { type: 'string', title: 'Zip', pattern: '^[0-9]{5}$' },
   },
 }
-const tree = jsonSchemaToTree(schema)
+const tree = jsonSchemaToRuntimeTree(schema)
 
 // `mode` is optional: omitting it exercises the provider's default policy
 // (ADR 027 makes that `'touched'`).

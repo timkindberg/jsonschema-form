@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { jsonSchemaToTree } from '@formframe/input-jsonschema'
+import { jsonSchemaToRuntimeTree } from '@formframe/input-jsonschema'
 import type { JSONSchema } from '@formframe/input-jsonschema'
 import { SchemaFields } from '@formframe/renderer-react'
 
@@ -84,7 +84,7 @@ function Section({
 }
 
 export default function App() {
-  const form = useMemo(() => jsonSchemaToTree(schema), [])
+  const form = useMemo(() => jsonSchemaToRuntimeTree(schema), [])
 
   return (
     <div>

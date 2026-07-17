@@ -86,6 +86,12 @@ export type {
   FormShape,
   TypedTree,
   TreeShapeOf,
+  OriginOf,
+  WidgetOverrideMap,
+  WidgetOverrideResolver,
+  WidgetOverridesOf,
+  ApplyWidgetOverrides,
+  OverriddenTree,
 } from './present/formShape'
 
 // JSON Pointer ↔ tree dot-path helpers (ADR 018) — shared with validation

@@ -10,7 +10,7 @@
 import { describe, it, expect } from 'vitest'
 import { render } from 'vitest-browser-react'
 import type { PresentationResolver } from '@formframe/core'
-import { jsonSchemaToTree } from '@formframe/input-jsonschema'
+import { jsonSchemaToRuntimeTree } from '@formframe/input-jsonschema'
 import type { JSONSchema } from '@formframe/input-jsonschema'
 import { useFormTree } from './useFormTree'
 
@@ -22,7 +22,7 @@ const schema: JSONSchema = {
   },
   required: ['tags'],
 }
-const tree = jsonSchemaToTree(schema)
+const tree = jsonSchemaToRuntimeTree(schema)
 
 // Module-scope (stable) so useFormTree's memo does not re-present each render.
 const toMultiselect: PresentationResolver = (facts) =>

@@ -128,14 +128,34 @@ memoization, and the selector cascade. Layering: `renderNode` (floor) ‹
   stays lazy (Core), so real cost tracks the paths you customize, not the schema
   size. The recipe is retained in git history as a fallback.
 
-## Known limitation: default-presentation only (bd bh7.8)
+## Follow-up: widget overrides threaded through the brand (bd bh7.8) — RESOLVED
 
-`FormShapeOf` resolves `widget` with `NoOverrides`, so the brand describes the
+The original ship of this ADR left a **default-presentation-only** limitation:
+`FormShapeOf` resolves `widget` with `NoOverrides`, so the brand described only the
 **default** presentation. A tree re-presented with `overrideWidgets` (via
-`useFormTree`/`present`) can therefore **desync** the typed control from what
-renders — the type says `choicegroup` while the DOM is a `<select>`. Path, value,
-and description narrowing are unaffected; only the control archetype is at risk,
-and only for overridden paths. This shipped documented (JSDoc on `FormShapeOf` and
-`useRenderNodeRules`) rather than fixed; the real fix threads an `Overrides` map
-through the brand (the `WidgetAt<S,P,Overrides>` seam already exists). Until then,
-treat the narrowed `Control` type as advisory for overridden paths.
+`useFormTree`/`present`) could therefore **desync** the typed control from what
+renders — the type said `choicegroup` while the DOM was a `<select>`.
+
+**bh7.8 closed this by threading the overrides through the brand**, exactly along
+the `WidgetAt<S,P,Overrides>` seam this ADR anticipated:
+
+- `overrideWidgets(map)` returns a resolver that carries the `const` override map as
+  a phantom on its type (`WidgetOverridesOf<R>` recovers it).
+- `useFormTree(tree, { resolvePresentation })` re-brands its returned `form` as
+  `TypedTree<ApplyWidgetOverrides<TS, WidgetOverridesOf<R>>, S>` — the presented
+  tree's `FormShape` has each overridden path's `widget` (and thus its derived
+  `Control`) rewritten to the override.
+
+So a customize binding typed off the **returned `form`** re-narrows to the
+OVERRIDDEN control, and the type can no longer desync from the DOM. `FormShapeOf<S>`
+itself still uses `NoOverrides` by design — it describes the *schema-derived* default
+tree; the override knowledge lives at the `present`/`useFormTree` boundary where the
+override actually happens.
+
+**Residual footgun (documented, not compile-enforced):** the re-narrowing rides the
+*presented* tree. If a consumer types `useRenderNodeRules(tree, …)` off the
+**pre-override input tree** instead of the `form` `useFormTree` returns, they get the
+default-widget narrowing again and the old desync returns. The JSDoc on
+`useFormTree`'s result and overload steers callers to "type off `form`, not the
+pre-override input"; there is no compile guard forcing it, because both trees are
+legitimately branded `TypedTree`s. Treat "type off `form`" as the contract.

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { jsonSchemaToTree } from './jsonSchemaToTree'
+import { jsonSchemaToRuntimeTree } from './jsonSchemaToTree'
 import type { JSONSchema } from './types'
 
 function largeObjectSchema(count: number): JSONSchema {
@@ -16,7 +16,7 @@ function largeObjectSchema(count: number): JSONSchema {
 describe('large schema robustness', () => {
   it('parses 120-property schemas without error', () => {
     const schema = largeObjectSchema(120)
-    const form = jsonSchemaToTree(schema)
+    const form = jsonSchemaToRuntimeTree(schema)
 
     expect(form.nodeType).toBe('group')
     expect(form.children).toHaveLength(120)
@@ -25,7 +25,7 @@ describe('large schema robustness', () => {
 
   it('getField resolves first, middle, and last properties', () => {
     const schema = largeObjectSchema(120)
-    const form = jsonSchemaToTree(schema)
+    const form = jsonSchemaToRuntimeTree(schema)
 
     expect(form.getField('prop_000')?.path).toBe('prop_000')
     expect(form.getField('prop_059')?.path).toBe('prop_059')
@@ -35,7 +35,7 @@ describe('large schema robustness', () => {
 
   it('walk visits every leaf field in a large schema', () => {
     const schema = largeObjectSchema(105)
-    const form = jsonSchemaToTree(schema)
+    const form = jsonSchemaToRuntimeTree(schema)
     const visited: string[] = []
 
     form.walk({

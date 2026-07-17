@@ -55,7 +55,7 @@ import type { FieldValues } from 'react-hook-form'
 import type { StandardSchemaV1 } from '@standard-schema/spec'
 import { standardSchemaResolver } from '@hookform/resolvers/standard-schema'
 import { toStandardSchema } from '@formframe/core'
-import { jsonSchemaToTree } from '@formframe/input-jsonschema'
+import { jsonSchemaToRuntimeTree } from '@formframe/input-jsonschema'
 import type { JSONSchema } from '@formframe/input-jsonschema'
 import { SchemaFields } from '@formframe/renderer-react'
 import type { EField, RenderNode } from '@formframe/renderer-react'
@@ -178,7 +178,7 @@ function RHFField({
 }
 
 export default function App() {
-  const form = useMemo(() => jsonSchemaToTree(schema), [])
+  const form = useMemo(() => jsonSchemaToRuntimeTree(schema), [])
   const validator = useMemo(() => createAjvValidator(schema), [])
   const resolver = useMemo(
     () =>

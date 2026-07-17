@@ -9,7 +9,7 @@
 
 import { describe, it, expect } from 'vitest'
 import { render } from 'vitest-browser-react'
-import { jsonSchemaToTree } from '@formframe/input-jsonschema'
+import { jsonSchemaToRuntimeTree } from '@formframe/input-jsonschema'
 import type { JSONSchema } from '@formframe/input-jsonschema'
 import { useState, useMemo } from 'react'
 import { createAjvValidator } from '@formframe/validation-ajv'
@@ -118,7 +118,7 @@ describe('render-count contract', () => {
   it('appending an item re-renders nothing in the existing items', async () => {
     const counts: Counts = {}
     const Counting = createRenderer(countingAdapter(counts))
-    const form = jsonSchemaToTree(arraySchema)
+    const form = jsonSchemaToRuntimeTree(arraySchema)
     const screen = await render(<Counting form={form} />)
 
     reset(counts)
@@ -141,7 +141,7 @@ describe('render-count contract', () => {
   it('removing the last item re-renders nothing in the survivors', async () => {
     const counts: Counts = {}
     const Counting = createRenderer(countingAdapter(counts))
-    const form = jsonSchemaToTree(arraySchema)
+    const form = jsonSchemaToRuntimeTree(arraySchema)
     const screen = await render(<Counting form={form} />)
 
     await screen.getByRole('button', { name: /add/i }).click()
@@ -171,7 +171,7 @@ describe('render-count contract', () => {
   it('removing a middle item re-renders only the items after it', async () => {
     const counts: Counts = {}
     const Counting = createRenderer(countingAdapter(counts))
-    const form = jsonSchemaToTree(arraySchema)
+    const form = jsonSchemaToRuntimeTree(arraySchema)
     const screen = await render(<Counting form={form} />)
 
     // grow to three items: contacts.0, .1, .2
@@ -206,7 +206,7 @@ describe('render-count contract', () => {
   it('an unrelated parent re-render runs zero node renderers', async () => {
     const counts: Counts = {}
     const Counting = createRenderer(countingAdapter(counts))
-    const form = jsonSchemaToTree(flatSchema)
+    const form = jsonSchemaToRuntimeTree(flatSchema)
 
     function Parent(): React.ReactNode {
       const [, setN] = useState(0)
@@ -245,7 +245,7 @@ const validationSchema: JSONSchema = {
     note: { type: 'string', title: 'Note' },
   },
 }
-const validationTree = jsonSchemaToTree(validationSchema)
+const validationTree = jsonSchemaToRuntimeTree(validationSchema)
 
 function ValidationCountingHarness({
   Counting,
@@ -305,7 +305,7 @@ const touchedGateSchema: JSONSchema = {
     zip: { type: 'string', title: 'Zip', pattern: '^[0-9]{5}$' },
   },
 }
-const touchedGateTree = jsonSchemaToTree(touchedGateSchema)
+const touchedGateTree = jsonSchemaToRuntimeTree(touchedGateSchema)
 
 function dispatchInput(input: HTMLInputElement, value: string) {
   input.value = value

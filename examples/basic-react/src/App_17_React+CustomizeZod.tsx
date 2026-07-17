@@ -164,15 +164,17 @@ function LiveCustomizedForm() {
   const tree = useMemo(() => zodToTree(schema), [])
   const validator = useMemo(() => createZodValidator(schema), [])
   const {
+    form,
     SchemaFields: Fields,
     submit,
     revalidate,
     errors,
   } = useFormTree(tree, { validator })
-  // `useRenderNodeRules` reads the tree's `FormShape` brand to type the rules,
-  // bakes in the memo, and hides the one intrinsic cast — the SAME React hook
-  // App_16 uses, no per-front-end binding (ADR 048).
-  const renderNode = useRenderNodeRules(tree, customizeRules)
+  // Type off `form` — the rendered tree — not the pre-present input (bd bh7.8), the
+  // desync-proof habit that lets a later `overrideWidgets` re-narrow the control for
+  // free. `useRenderNodeRules` reads that brand — the SAME React hook App_16 uses,
+  // no per-front-end binding (ADR 048).
+  const renderNode = useRenderNodeRules(form, customizeRules)
   const [data, setData] = useState<Record<string, unknown> | null>(null)
   return (
     <form noValidate onSubmit={submit((d) => setData(d))} onInput={revalidate}>

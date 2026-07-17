@@ -9,7 +9,7 @@ import { useMemo, useState } from 'react'
 import { describe, it, expect } from 'vitest'
 import { render } from 'vitest-browser-react'
 import type { ValidationError } from '@formframe/core'
-import { jsonSchemaToTree } from '@formframe/input-jsonschema'
+import { jsonSchemaToRuntimeTree } from '@formframe/input-jsonschema'
 import type { JSONSchema } from '@formframe/input-jsonschema'
 import {
   SchemaFields,
@@ -58,7 +58,7 @@ describe('renderNodeRules — selector cascade (ADR 047 §3)', () => {
       r.allFields(AllFields)
       r.field('name', NameHandler)
     })
-    const form = jsonSchemaToTree(schema)
+    const form = jsonSchemaToRuntimeTree(schema)
     const screen = await render(<SchemaFields form={form} renderNode={rn} />)
     // `name` picks the exact-path rule even though allFields also matches, and
     // order of registration does not matter (registered blanket-first above).
@@ -77,7 +77,7 @@ describe('renderNodeRules — selector cascade (ADR 047 §3)', () => {
         </div>
       ))
     })
-    const form = jsonSchemaToTree(schema)
+    const form = jsonSchemaToRuntimeTree(schema)
     const screen = await render(<SchemaFields form={form} renderNode={rn} />)
     // `name` is an <input>; the small enum `plan` is a radio (choicegroup), so it
     // must NOT match the input-kind rule.
@@ -95,7 +95,7 @@ describe('renderNodeRules — selector cascade (ADR 047 §3)', () => {
     const rn = renderNodeRules((r) => {
       r.field('name', ({ Default }: FieldHandlerProps) => <>{Default()}</>)
     })
-    const form = jsonSchemaToTree(schema)
+    const form = jsonSchemaToRuntimeTree(schema)
     const screen = await render(<SchemaFields form={form} renderNode={rn} />)
     await expect
       .element(screen.getByRole('textbox', { name: 'Street' }))
@@ -116,7 +116,7 @@ describe('renderNodeRules — arrangeable parts (ADR 047 §2)', () => {
     const rn = renderNodeRules((r) => {
       r.group('address', Card)
     })
-    const form = jsonSchemaToTree(schema)
+    const form = jsonSchemaToRuntimeTree(schema)
     const screen = await render(<SchemaFields form={form} renderNode={rn} />)
     await expect.element(screen.getByTestId('card')).toBeInTheDocument()
     await expect
@@ -141,7 +141,7 @@ describe('renderNodeRules — arrangeable parts (ADR 047 §2)', () => {
       )
     }
     const rn = renderNodeRules((r) => r.field('name', Stateful))
-    const form = jsonSchemaToTree(schema)
+    const form = jsonSchemaToRuntimeTree(schema)
     const screen = await render(<SchemaFields form={form} renderNode={rn} />)
     await expect
       .element(screen.getByRole('button'))
@@ -165,7 +165,7 @@ describe('renderNodeRules — one registrar, cascading scopes (ADR 047 §6)', ()
       ))
     // Composed app-first, form-last: form wins the tie on `name` (CSS cascade).
     const rn = renderNodeRules(app, form)
-    const f = jsonSchemaToTree(schema)
+    const f = jsonSchemaToRuntimeTree(schema)
     const screen = await render(<SchemaFields form={f} renderNode={rn} />)
     await expect.element(screen.getByTestId('form-name')).toBeInTheDocument()
     expect(document.querySelectorAll('[data-testid="app-name"]').length).toBe(0)
@@ -186,7 +186,7 @@ describe('renderNodeRules — one registrar, cascading scopes (ADR 047 §6)', ()
         </div>
       ))
     })
-    const f = jsonSchemaToTree(schema)
+    const f = jsonSchemaToRuntimeTree(schema)
     const screen = await render(<SchemaFields form={f} renderNode={rn} />)
     await expect
       .element(screen.getByTestId('inline-label'))
@@ -200,7 +200,7 @@ describe('renderNodeRules — Errors promoted to a movable part keeps a11y (ADR 
   ]
 
   function CustomArrangement() {
-    const form = useMemo(() => jsonSchemaToTree(schema), [])
+    const form = useMemo(() => jsonSchemaToRuntimeTree(schema), [])
     // Errors deliberately placed in a SEPARATE wrapper from the control, to prove
     // the aria linkage rides on shared ids/context, not a fixed layout.
     const rn = useMemo(

@@ -1,5 +1,5 @@
 import { useFormTree } from '@formframe/renderer-react'
-import { jsonSchemaToTree } from '@formframe/input-jsonschema'
+import { jsonSchemaToRuntimeTree } from '@formframe/input-jsonschema'
 import type { JSONSchema } from '@formframe/input-jsonschema'
 
 const schema: JSONSchema = {
@@ -48,7 +48,7 @@ const schema: JSONSchema = {
   },
   required: ['name', 'email', 'theme', 'terms'],
 }
-const tree = jsonSchemaToTree(schema)
+const tree = jsonSchemaToRuntimeTree(schema)
 
 function App() {
   const { SchemaFields, submit } = useFormTree(tree)
@@ -63,8 +63,8 @@ function App() {
     <div>
       <h1>JSON Schema Form - useFormTree Hook</h1>
       <p>
-        Compile with <code>jsonSchemaToTree(schema)</code>, then bind React
-        behavior with <code>useFormTree(tree)</code>. It returns{' '}
+        Compile with <code>jsonSchemaToRuntimeTree(schema)</code>, then bind
+        React behavior with <code>useFormTree(tree)</code>. It returns{' '}
         <code>{'{ SchemaFields, submit }'}</code>. <code>SchemaFields</code>{' '}
         renders the form content; you own the <code>&lt;form&gt;</code> + submit
         (ADR 013).

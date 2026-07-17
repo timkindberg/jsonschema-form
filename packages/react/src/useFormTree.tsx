@@ -10,11 +10,15 @@ import {
 } from 'react'
 import { present, defaultPresentation, layered } from '@formframe/core'
 import type {
+  ApplyWidgetOverrides,
+  FormShape,
   GroupNode,
+  TypedTree,
   Validator,
   ValidationError,
   ValidationResult,
   PresentationResolver,
+  WidgetOverridesOf,
 } from '@formframe/core'
 import {
   SchemaFields as SchemaFieldsRenderer,
@@ -48,6 +52,7 @@ export interface FormTreeValidation {
 export interface UseFormTreeOptions<
   S = unknown,
   Output = Record<string, unknown>,
+  R extends PresentationResolver<S> = PresentationResolver<S>,
 > {
   /**
    * A side-loaded validator (ADR 019), normally from the same source adapter as
@@ -59,8 +64,13 @@ export interface UseFormTreeOptions<
    * Consumer presentation resolver (ADR 029). It runs above the shipped default
    * presentation and receives the tree's source-specific `origin.schema` type.
    * Keep the function reference stable; a new resolver re-presents the tree.
+   *
+   * When this is a typed `overrideWidgets(map)` resolver, the `const` map is
+   * threaded into the returned `form`'s `FormShape` brand, so typing a customize
+   * binding off `form` re-narrows the control to the OVERRIDDEN widget — no desync
+   * between the typed control and what renders (bd bh7.8).
    */
-  resolvePresentation?: PresentationResolver<S>
+  resolvePresentation?: R
 }
 
 /**
@@ -71,10 +81,52 @@ export interface UseFormTreeOptions<
  * presentation, a bound `SchemaFields`, native submission, validation errors,
  * live revalidation, and touched/submit state.
  */
+export interface UseFormTreeResult<F, Output> {
+  /** The presented tree that actually renders. For a branded input tree it carries
+   * the `FormShape` re-narrowed by any widget overrides `resolvePresentation`
+   * supplied (bd bh7.8) — type your customize binding off THIS, not the pre-override
+   * input, and the typed control cannot desync from what renders. */
+  form: F
+  SchemaFields: FC<BoundSchemaFieldsProps>
+  submit: (
+    onValid?: (data: Output) => void
+  ) => (event: FormEvent<HTMLFormElement>) => void
+  revalidate: (event: SyntheticEvent<HTMLFormElement>) => void
+  validation: FormTreeValidation
+  errors: ValidationError[]
+  handleBlur: (event: FocusEvent<HTMLFormElement>) => void
+  touched: ReadonlySet<string>
+  submitted: boolean
+}
+
+/**
+ * Bind React behavior to a **branded** tree (`jsonSchemaToTree`/`zodToTree`): the
+ * returned `form` carries the tree's `FormShape` re-narrowed by any widget overrides
+ * `resolvePresentation` supplies (bd bh7.8). Type `useRenderNodeRules(form, …)` off
+ * this `form`, not the pre-override input tree, and the typed control cannot desync
+ * from what actually renders.
+ */
+export function useFormTree<
+  TS extends FormShape,
+  S,
+  Output = Record<string, unknown>,
+  R extends PresentationResolver<S> = PresentationResolver<S>,
+>(
+  tree: TypedTree<TS, S>,
+  options?: UseFormTreeOptions<S, Output, R>
+): UseFormTreeResult<
+  TypedTree<ApplyWidgetOverrides<TS, WidgetOverridesOf<R>>, S>,
+  Output
+>
+/** Bind React behavior to a plain (unbranded) tree — no `FormShape` to thread. */
+export function useFormTree<S = unknown, Output = Record<string, unknown>>(
+  tree: GroupNode<S>,
+  options?: UseFormTreeOptions<S, Output>
+): UseFormTreeResult<GroupNode<S>, Output>
 export function useFormTree<S = unknown, Output = Record<string, unknown>>(
   tree: GroupNode<S>,
   options: UseFormTreeOptions<S, Output> = {}
-) {
+): UseFormTreeResult<GroupNode<S>, Output> {
   const { validator, resolvePresentation } = options
   const form = useMemo(
     () =>

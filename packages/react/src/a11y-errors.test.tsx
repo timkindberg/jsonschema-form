@@ -7,7 +7,7 @@ import { useMemo } from 'react'
 import { describe, it, expect } from 'vitest'
 import { render } from 'vitest-browser-react'
 import type { ValidationError } from '@formframe/core'
-import { jsonSchemaToTree } from '@formframe/input-jsonschema'
+import { jsonSchemaToRuntimeTree } from '@formframe/input-jsonschema'
 import type { JSONSchema } from '@formframe/input-jsonschema'
 import {
   SchemaFields,
@@ -67,7 +67,7 @@ function FormWithValidation({
   showSummary?: boolean
   formSchema?: JSONSchema
 }) {
-  const form = useMemo(() => jsonSchemaToTree(formSchema), [formSchema])
+  const form = useMemo(() => jsonSchemaToRuntimeTree(formSchema), [formSchema])
   // a11y wiring is about how a *shown* error is announced, not the touched
   // display policy (ADR 027) — so report immediately here.
   return (

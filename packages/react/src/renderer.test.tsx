@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { render } from 'vitest-browser-react'
-import { jsonSchemaToTree } from '@formframe/input-jsonschema'
+import { jsonSchemaToRuntimeTree } from '@formframe/input-jsonschema'
 import type { JSONSchema } from '@formframe/input-jsonschema'
 import { SchemaFields, createRenderer, defaultAdapter } from './renderer'
 
@@ -28,7 +28,7 @@ const schema: JSONSchema = {
 
 describe('SchemaFields', () => {
   it('renders every node default with no renderNode', async () => {
-    const form = jsonSchemaToTree(schema)
+    const form = jsonSchemaToRuntimeTree(schema)
     const screen = await render(<SchemaFields form={form} />)
 
     await expect
@@ -42,14 +42,14 @@ describe('SchemaFields', () => {
   })
 
   it('renders content only — no <form> or submit chrome (consumer owns it)', async () => {
-    const form = jsonSchemaToTree(schema)
+    const form = jsonSchemaToRuntimeTree(schema)
     await render(<SchemaFields form={form} />)
     expect(document.querySelector('form')).toBeNull()
     expect(document.querySelector('button[type="submit"]')).toBeNull()
   })
 
   it('renderNode hijacks one node; the rest stay default', async () => {
-    const form = jsonSchemaToTree(schema)
+    const form = jsonSchemaToRuntimeTree(schema)
     const screen = await render(
       <SchemaFields
         form={form}
@@ -71,7 +71,7 @@ describe('SchemaFields', () => {
   })
 
   it('parts override: swap one part, keep the rest default (input variant)', async () => {
-    const form = jsonSchemaToTree(schema)
+    const form = jsonSchemaToRuntimeTree(schema)
     const screen = await render(
       <SchemaFields
         form={form}
@@ -101,7 +101,7 @@ describe('SchemaFields', () => {
   })
 
   it('place-yourself: compose field parts by hand via <Default of={part}/>', async () => {
-    const form = jsonSchemaToTree(schema)
+    const form = jsonSchemaToRuntimeTree(schema)
     const screen = await render(
       <SchemaFields
         form={form}
@@ -129,7 +129,7 @@ describe('SchemaFields', () => {
   })
 
   it('place-yourself at the root: custom layout via children render-prop', async () => {
-    const form = jsonSchemaToTree(schema)
+    const form = jsonSchemaToRuntimeTree(schema)
     const screen = await render(
       <SchemaFields form={form}>
         {(root, { Default }) => (
@@ -152,7 +152,7 @@ describe('SchemaFields', () => {
   })
 
   it('scoped renderNode applies only within a subtree', async () => {
-    const form = jsonSchemaToTree(schema)
+    const form = jsonSchemaToRuntimeTree(schema)
     const screen = await render(
       <SchemaFields form={form}>
         {(root, { Default }) => {
@@ -181,7 +181,7 @@ describe('SchemaFields', () => {
 describe('createRenderer — the floor (ADR 013)', () => {
   it('an empty partial set renders diagnostic markers, not real inputs', async () => {
     const Floor = createRenderer({})
-    const form = jsonSchemaToTree(schema)
+    const form = jsonSchemaToRuntimeTree(schema)
     await render(<Floor form={form} />)
     expect(document.querySelector('[data-jsf-not-implemented]')).not.toBeNull()
     expect(document.querySelector('input')).toBeNull()
@@ -196,7 +196,7 @@ describe('createRenderer — the floor (ADR 013)', () => {
           ) : null,
       },
     })
-    const form = jsonSchemaToTree(schema)
+    const form = jsonSchemaToRuntimeTree(schema)
     await render(<Floor form={form} />)
     // the implemented input is real…
     expect(document.querySelector('input[data-floor]')).not.toBeNull()
@@ -208,7 +208,7 @@ describe('createRenderer — the floor (ADR 013)', () => {
 
   it('createRenderer(defaultAdapter) is the batteries SchemaFields', async () => {
     const Floor = createRenderer(defaultAdapter)
-    const form = jsonSchemaToTree(schema)
+    const form = jsonSchemaToRuntimeTree(schema)
     const screen = await render(<Floor form={form} />)
     await expect
       .element(screen.getByRole('textbox', { name: 'Name' }))

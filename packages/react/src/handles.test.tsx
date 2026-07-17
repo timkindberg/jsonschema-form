@@ -11,7 +11,7 @@
 import { describe, it, expect } from 'vitest'
 import { render } from 'vitest-browser-react'
 import { useState } from 'react'
-import { jsonSchemaToTree } from '@formframe/input-jsonschema'
+import { jsonSchemaToRuntimeTree } from '@formframe/input-jsonschema'
 import type { JSONSchema } from '@formframe/input-jsonschema'
 import { SchemaFields, Default, Children } from './index'
 
@@ -37,7 +37,7 @@ const schema: JSONSchema = {
 
 describe('component handles — <Default of/> / <Children of/>', () => {
   it('injects { Default } into renderNode; <Default of={node}/> renders the default', async () => {
-    const form = jsonSchemaToTree(schema)
+    const form = jsonSchemaToRuntimeTree(schema)
     const screen = await render(
       <SchemaFields
         form={form}
@@ -53,7 +53,7 @@ describe('component handles — <Default of/> / <Children of/>', () => {
   })
 
   it('is importable AND injected — both refer to the same component', async () => {
-    const form = jsonSchemaToTree(schema)
+    const form = jsonSchemaToRuntimeTree(schema)
     const screen = await render(
       <SchemaFields
         form={form}
@@ -70,7 +70,7 @@ describe('component handles — <Default of/> / <Children of/>', () => {
   })
 
   it('renders a PART via <Default of={part}/>, and is null-safe for an absent part', async () => {
-    const form = jsonSchemaToTree(schema)
+    const form = jsonSchemaToRuntimeTree(schema)
     const screen = await render(
       <SchemaFields form={form}>
         {(root, { Default }) => {
@@ -105,7 +105,7 @@ describe('component handles — <Default of/> / <Children of/>', () => {
   })
 
   it('renders container children via <Children of={node}/> inside a hijacked wrapper', async () => {
-    const form = jsonSchemaToTree(schema)
+    const form = jsonSchemaToRuntimeTree(schema)
     const screen = await render(
       <SchemaFields
         form={form}
@@ -128,7 +128,7 @@ describe('component handles — <Default of/> / <Children of/>', () => {
   })
 
   it('a node that truly re-renders via <Default of/> keeps its value (no remount)', async () => {
-    const form = jsonSchemaToTree(schema)
+    const form = jsonSchemaToRuntimeTree(schema)
 
     function Parent() {
       const [n, setN] = useState(0)

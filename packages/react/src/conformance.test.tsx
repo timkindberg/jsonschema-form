@@ -28,7 +28,7 @@ import { describe, it, expect } from 'vitest'
 import { render } from 'vitest-browser-react'
 import { present, defaultPresentation, layered } from '@formframe/core'
 import type { GroupNode, PresentationResolver } from '@formframe/core'
-import { jsonSchemaToTree } from '@formframe/input-jsonschema'
+import { jsonSchemaToRuntimeTree } from '@formframe/input-jsonschema'
 import type { JSONSchema, JSONSchemaObject } from '@formframe/input-jsonschema'
 import {
   renderToString,
@@ -48,10 +48,10 @@ function presented(
   resolver?: PresentationResolver
 ): GroupNode<JSONSchemaObject> {
   // re-presenting returns a plain (unbranded) tree — the ADR-042 brand rides the
-  // original `jsonSchemaToTree` result that `useRenderNodeRules` consumes; here we
+  // original `jsonSchemaToRuntimeTree` result that `useRenderNodeRules` consumes; here we
   // only fold to DOM, so an unbranded `GroupNode` is exactly right.
   return present<JSONSchemaObject>(
-    jsonSchemaToTree(schema),
+    jsonSchemaToRuntimeTree(schema),
     resolver ? layered(defaultPresentation, resolver) : defaultPresentation
   )
 }
