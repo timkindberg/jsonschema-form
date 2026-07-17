@@ -1,0 +1,50 @@
+# Triaged MIGRATE set (36) — bd → GitHub Issues
+# See plan: Triage then migrate bd → GitHub
+
+# P1
+jsonschema-form-2oc
+jsonschema-form-5ss
+jsonschema-form-bh7
+jsonschema-form-bh7.8
+
+# P2
+jsonschema-form-9jk
+jsonschema-form-5ss.5
+jsonschema-form-8f6
+jsonschema-form-bh7.9
+jsonschema-form-bh7.10
+jsonschema-form-tj0
+
+# P3 — schema / Zod gaps
+jsonschema-form-2qx
+jsonschema-form-3eg
+jsonschema-form-a58
+jsonschema-form-aml
+jsonschema-form-avw
+jsonschema-form-c5t
+jsonschema-form-33i
+jsonschema-form-6xz
+jsonschema-form-fng
+jsonschema-form-miu
+
+# P3 — submit / arrays / widgets
+jsonschema-form-8pr
+jsonschema-form-u01
+jsonschema-form-zwn
+jsonschema-form-jzi
+jsonschema-form-xmk
+jsonschema-form-kon
+
+# P3 — vanilla / form-state / validation UX
+jsonschema-form-gig
+jsonschema-form-st5
+jsonschema-form-sqh
+jsonschema-form-mjm
+jsonschema-form-o1x
+jsonschema-form-5xd
+jsonschema-form-1oz
+
+# P3 — chores
+jsonschema-form-1aq
+jsonschema-form-i6p
+jsonschema-form-xgm

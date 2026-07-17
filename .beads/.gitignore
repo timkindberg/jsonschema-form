@@ -29,3 +29,7 @@ LOCK
 embeddeddolt/
 interactions.jsonl
 last-touched
+
+# Migration scratch (durable copy lives in scripts/)
+migration-dryrun.md
+migration-map.json
